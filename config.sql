@@ -16,7 +16,7 @@ CREATE TABLE videos
 
 CREATE TABLE users
 (
-    id                 UUID PRIMARY KEY,
+    id                 VARCHAR(255) PRIMARY KEY,
     name               TEXT         NOT NULL,
     password           VARCHAR(255) NOT null,
     subscription_level TEXT         NOT NULL DEFAULT 'STANDARD',
@@ -29,14 +29,14 @@ CREATE TABLE users
 CREATE TABLE views
 (
     video_id  UUID NOT NULL REFERENCES videos (id) ON DELETE CASCADE,
-    user_id   UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    user_id   VARCHAR(255) NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     viewed_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE likes
 (
     video_id UUID NOT NULL REFERENCES videos (id) ON DELETE CASCADE,
-    user_id  UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    user_id  VARCHAR(255) NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     liked_at TIMESTAMP DEFAULT NOW(),
     CONSTRAINT unique_like UNIQUE (video_id, user_id)
 );
@@ -54,4 +54,11 @@ CREATE TABLE video_chunks
     chunk_size     INT NOT NULL,
     start_position INT NOT NULL,
     end_position   INT NOT NULL
+);
+
+CREATE TABLE sessions
+(
+    id          UUID PRIMARY KEY,
+    user_id     VARCHAR(255)      NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    accessed_at TIMESTAMP NOT NULL DEFAULT NOW()
 );

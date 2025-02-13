@@ -1,14 +1,13 @@
+import com.example.src.utils.*
 import io.github.cdimascio.dotenv.Dotenv
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.jooq.DSLContext
-import org.jooq.Field
 import org.jooq.Record
 import org.jooq.SQLDialect
 import org.jooq.impl.DSL
-import org.jooq.impl.TableImpl
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
@@ -73,11 +72,6 @@ class DB private constructor() {
     }
 }
 
-object AdminUsers : TableImpl<Record>(DSL.name("admin_users")) {
-    val USERNAME: Field<String> = DSL.field(DSL.name("username"), String::class.java)
-    val PASSWORD: Field<String> = DSL.field(DSL.name("password"), String::class.java)
-}
-
 enum class VideoStatus(val value: String) {
     PENDING("PENDING"), PENDING_UPLOAD("PENDING_UPLOAD"), UPLOADING("UPLOADING"), PROCESSING("PROCESSING"), READY("READY"), DELETING(
         "DELETING"
@@ -86,40 +80,6 @@ enum class VideoStatus(val value: String) {
     override fun toString(): String {
         return value
     }
-}
-
-object Videos : TableImpl<Record>(DSL.name("videos")) {
-    val ID: Field<UUID> = DSL.field(DSL.name("id"), UUID::class.java)
-    val NAME: Field<String> = DSL.field(DSL.name("name"), String::class.java)
-    val CREATEDAT: Field<Timestamp> = DSL.field(DSL.name("created_at"), Timestamp::class.java)
-    val UPLOADEDAT: Field<Timestamp?> = DSL.field(DSL.name("uploaded_at"), Timestamp::class.java)
-    val STATUS: Field<String> = DSL.field(DSL.name("status"), String::class.java)
-    val ISPREMIUM: Field<Boolean> = DSL.field(DSL.name("is_premium"), Boolean::class.java)
-}
-
-object VideosTemp : TableImpl<Record>(DSL.name("videos_temp")) {
-    val ID: Field<UUID> = DSL.field(DSL.name("id"), UUID::class.java)
-    val FILENAME: Field<String> = DSL.field(DSL.name("filename"), String::class.java)
-}
-
-object VideoChunks : TableImpl<Record>(DSL.name("video_chunks")) {
-    val ID: Field<UUID> = DSL.field(DSL.name("id"), UUID::class.java)
-    val VIDEOID: Field<UUID> = DSL.field(DSL.name("video_id"), UUID::class.java)
-    val CHUNKSIZE: Field<Int> = DSL.field(DSL.name("chunk_size"), Int::class.java)
-    val START: Field<Int> = DSL.field(DSL.name("start_position"), Int::class.java)
-    val END: Field<Int> = DSL.field(DSL.name("end_position"), Int::class.java)
-}
-
-object Views : TableImpl<Record>(DSL.name("views")) {
-    val VIDEOID: Field<UUID> = DSL.field(DSL.name("video_id"), UUID::class.java)
-    val USERID: Field<UUID> = DSL.field(DSL.name("user_id"), UUID::class.java)
-    val VIEWEDAT: Field<Timestamp> = DSL.field(DSL.name("viewed_at"), Timestamp::class.java)
-}
-
-object Likes : TableImpl<Record>(DSL.name("likes")) {
-    val VIDEOID: Field<UUID> = DSL.field(DSL.name("video_id"), UUID::class.java)
-    val USERID: Field<UUID> = DSL.field(DSL.name("user_id"), UUID::class.java)
-    val LIKEDAT: Field<Timestamp> = DSL.field(DSL.name("liked_at"), Timestamp::class.java)
 }
 
 class DBHelpers {
@@ -222,7 +182,7 @@ class DBHelpers {
             }
         }
 
-        suspend fun createVideoV2(
+        suspend fun createVideo(
             name: String, isPremium: Boolean, bufferSize: Int, extension: String
         ): VideoCreationResponse? = ioOperation {
             try {
@@ -333,5 +293,43 @@ class DBHelpers {
 
             result
         }
+
+        @Serializable
+        data class User(
+            val id: String, val name: String, val subscription_level: String, val subscription_till: String?
+        )
+
+        suspend fun getUser(username: String): User = ioOperationWithErrorHandling("Cannot get user.") {
+            val user = db.getDSLContext().select().from(Users).where(Users.ID.eq(username)).fetchOne { record ->
+                User(
+                    id = record[Users.ID],
+                    name = record[Users.NAME],
+                    subscription_level = record[Users.SUBSCRIPTIONLEVEL],
+                    subscription_till = record[Users.SUBSCRIPTIONTILL].toString()
+                )
+            }
+
+            if(user == null) throw Exception("User does not exist in db.")
+            user
+        }
+
+        suspend fun getUserPassword(username: String): String = ioOperationWithErrorHandling("Cannot get user."){
+            db.getDSLContext().select().from(Users).where(Users.ID.eq(username)).fetchOne { record -> record[Users.PASSWORD]} ?: ""
+        }
+
+        suspend fun createUser(username: String, name: String, password: String) = ioOperationWithErrorHandling("Cannot create a new user.") {
+            db.getDSLContext().insertInto(Users).columns(Users.ID, Users.NAME, Users.PASSWORD)
+                .values(username, name, password).onConflict(Users.ID).doNothing()
+                .execute()
+        }
+
+        suspend fun createSession(username: String): String =
+            ioOperationWithErrorHandling("Cannot create a session.") {
+                val id = UUID.randomUUID()
+
+                db.getDSLContext().insertInto(Sessions).columns(Sessions.ID, Sessions.USERID).values(id, username)
+
+                id.toString()
+            }
     }
 }

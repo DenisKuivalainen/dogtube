@@ -1,6 +1,7 @@
 package com.example
 
 import com.example.src.Admin
+import com.example.src.Users
 import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.server.application.*
@@ -8,7 +9,6 @@ import io.ktor.server.auth.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import ioOperation
 
 private suspend inline fun ApplicationCall.handleAdminUserRequest(
     crossinline action: suspend (String, String) -> Unit
@@ -88,7 +88,7 @@ fun Route.adminVideos() {
             return@get
         }
 
-        val imageByteArray = ioOperation { Admin.getThumbnail(videoId) }
+        val imageByteArray = Admin.getThumbnail(videoId)
         if (imageByteArray != null) {
             call.respondBytes(imageByteArray, ContentType.Image.JPEG)
         } else {
@@ -99,7 +99,7 @@ fun Route.adminVideos() {
     authenticate("admin_jwt") {
         route("admin/video") {
             get { // Get all videos
-                val res = ioOperation { Admin.getAllVideosAdmin() }
+                val res = Admin.getAllVideosAdmin()
                 if (res != null) {
                     call.respond(HttpStatusCode.OK, res)
                 } else {
@@ -109,8 +109,7 @@ fun Route.adminVideos() {
 
             post { // Prepare for video multipart upload
                 val body = call.receive<PostVideoRequest>()
-                val res =
-                    ioOperation { Admin.createVideo(body.name, body.isPremium, body.bufferSize, body.extension) }
+                val res = Admin.createVideo(body.name, body.isPremium, body.bufferSize, body.extension)
                 if (res != null) {
                     call.respond(HttpStatusCode.OK, res)
                 } else {
@@ -126,7 +125,7 @@ fun Route.adminVideos() {
                         return@get
                     }
 
-                    val res = ioOperation { Admin.getVideoAdmin(videoId) }
+                    val res = Admin.getVideoAdmin(videoId)
                     if (res != null) {
                         call.respond(HttpStatusCode.OK, res)
                     } else {
@@ -141,7 +140,7 @@ fun Route.adminVideos() {
                         return@delete
                     }
 
-                    val res = ioOperation { Admin.deleteVideoAdmin(videoId) }
+                    val res = Admin.deleteVideoAdmin(videoId)
                     if (res) {
                         call.respond(HttpStatusCode.NoContent)
                     } else {
@@ -181,13 +180,49 @@ fun Route.adminVideos() {
                         return@put
                     }
 
-                    val uploadResult = ioOperation { Admin.uploadVideoChunkV2(videoId, chunkId!!, chunkData!!) }
+                    val uploadResult = Admin.uploadVideoChunk(videoId, chunkId!!, chunkData!!)
                     if (!uploadResult) {
                         call.respondText("Chunk was not uploaded.", status = HttpStatusCode.BadRequest)
                         return@put
                     }
 
                     call.respond(HttpStatusCode.OK)
+                }
+            }
+        }
+    }
+}
+
+fun Route.user() {
+    route("user") {
+        route("create") {
+            post {
+                val body = call.receive<CreateUserRequest>()
+
+                val res = Users.createUser(body.username, body.name, body.password)
+                val cookie = res.data
+
+                if (cookie != null) {
+                    call.response.cookies.append(cookie)
+                    call.respond(HttpStatusCode.Created)
+                } else {
+                    call.respondText(res.error!!, status = HttpStatusCode.BadRequest)
+                }
+            }
+        }
+
+        route("login") {
+            post {
+                val body = call.receive<LoginUserRequest>()
+
+                val res = Users.loginUser(body.username, body.password)
+                val cookie = res.data
+
+                if (cookie != null) {
+                    call.response.cookies.append(cookie)
+                    call.respond(HttpStatusCode.Created)
+                } else {
+                    call.respondText(res.error!!, status = HttpStatusCode.BadRequest)
                 }
             }
         }
