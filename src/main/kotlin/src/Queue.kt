@@ -17,26 +17,23 @@ val semaphore = Semaphore(10)
 
 suspend fun processVideo(_videoId: String) = ioOperation {
     semaphore.acquire()
-    try{
-    val videoId = UUID.fromString(_videoId)
+    try {
+        val videoId = UUID.fromString(_videoId)
 
-    val srcVideoName = DBHelpers.getVideoFilename(videoId)
-    val processedVideoName = "${_videoId}.mp4"
+        val srcVideoName = DBHelpers.getVideoFilename(videoId)
+        val processedVideoName = "${_videoId}.mp4"
 
-    val resizeResult = resizeVideo(srcVideoName!!, processedVideoName)
-    if (!resizeResult) {
-        throw Exception("Video resize error.")
-    }
+        val resizeResult = resizeVideo(srcVideoName, processedVideoName)
+        if (!resizeResult) {
+            throw Exception("Video resize error.")
+        }
 
-    val thumbnailGenerationResult = generateThumbnail(_videoId, FSHelpers.getVideoSrcFilePath(srcVideoName))
-    if (!thumbnailGenerationResult) {
-        throw Exception("Thumbnail generation error.")
-    }
+        generateThumbnail(_videoId, FSHelpers.getVideoSrcFilePath(srcVideoName))
 
-    DBHelpers.deleteVideoTemp(videoId)
-    FSHelpers.deleteSrcVideo(srcVideoName)
-    DBHelpers.setVideoReady(videoId)}
-    finally {
+        DBHelpers.deleteVideoTemp(videoId)
+        FSHelpers.deleteSrcVideo(srcVideoName)
+        DBHelpers.setVideoReady(videoId)
+    } finally {
         semaphore.release()
     }
 }

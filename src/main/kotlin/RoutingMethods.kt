@@ -39,13 +39,13 @@ fun Route.adminUser() {
                 val principal = call.principal<UserPrincipal>()
 
                 if (principal != null) {
-                    val adminUser = Admin.getAdminUser(principal.username)
-                    if (adminUser == null) {
-                        call.respond(HttpStatusCode.BadRequest, "User not exists.")
-                        return@get
+                    val res = Admin.getAdminUser(principal.username)
+                    val resData = res.data
+                    if (resData != null) {
+                        call.respond(HttpStatusCode.OK, resData)
+                    } else {
+                        call.respond(HttpStatusCode.BadRequest, res.error!!)
                     }
-
-                    call.respond(HttpStatusCode.Created, adminUser)
                 } else {
                     call.respond(HttpStatusCode.Unauthorized, "Invalid token.")
                 }
@@ -55,25 +55,25 @@ fun Route.adminUser() {
         authenticate("admin_api_key") {
             post {
                 call.handleAdminUserRequest { username, password ->
-                    val userCreated = Admin.createAdminUser(username, password)
-
-                    if (userCreated) {
-                        call.respond(HttpStatusCode.Created)
-                        return@handleAdminUserRequest
+                    val res = Admin.createAdminUser(username, password)
+                    val resData = res.data
+                    if (resData != null) {
+                        call.respond(HttpStatusCode.Created, resData)
+                    } else {
+                        call.respond(HttpStatusCode.BadRequest, res.error!!)
                     }
-
-                    call.respondText("User was not created.", status = HttpStatusCode.Forbidden)
                 }
             }
         }
 
         post("login") {
             call.handleAdminUserRequest { username, password ->
-                val jwt = Admin.authAdminUser(username, password)
-                if (jwt != null) {
-                    call.respond(HttpStatusCode.OK, jwt)
+                val res = Admin.authAdminUser(username, password)
+                val resData = res.data
+                if (resData != null) {
+                    call.respond(HttpStatusCode.OK, resData)
                 } else {
-                    call.respondText("Invalid username or password.", status = HttpStatusCode.Unauthorized)
+                    call.respond(HttpStatusCode.BadRequest, res.error!!)
                 }
             }
         }
@@ -88,11 +88,12 @@ fun Route.adminVideos() {
             return@get
         }
 
-        val imageByteArray = Admin.getThumbnail(videoId)
-        if (imageByteArray != null) {
-            call.respondBytes(imageByteArray, ContentType.Image.JPEG)
+        val res = Admin.getThumbnail(videoId)
+        val resData = res.data
+        if (resData != null) {
+            call.respondBytes(resData, ContentType.Image.JPEG, HttpStatusCode.OK)
         } else {
-            call.respond(HttpStatusCode.NotFound, "Thumbnail not found.")
+            call.respond(HttpStatusCode.BadRequest, res.error!!)
         }
     }
 
@@ -100,20 +101,22 @@ fun Route.adminVideos() {
         route("admin/video") {
             get { // Get all videos
                 val res = Admin.getAllVideosAdmin()
-                if (res != null) {
-                    call.respond(HttpStatusCode.OK, res)
+                val resData = res.data
+                if (resData != null) {
+                    call.respond(HttpStatusCode.OK, resData)
                 } else {
-                    call.respondText("Failed to create video record.", status = HttpStatusCode.BadRequest)
+                    call.respond(HttpStatusCode.BadRequest, res.error!!)
                 }
             }
 
             post { // Prepare for video multipart upload
                 val body = call.receive<PostVideoRequest>()
                 val res = Admin.createVideo(body.name, body.isPremium, body.bufferSize, body.extension)
-                if (res != null) {
-                    call.respond(HttpStatusCode.OK, res)
+                val resData = res.data
+                if (resData != null) {
+                    call.respond(HttpStatusCode.OK, resData)
                 } else {
-                    call.respondText("Failed to create video record.", status = HttpStatusCode.BadRequest)
+                    call.respond(HttpStatusCode.BadRequest, res.error!!)
                 }
             }
 
@@ -126,10 +129,11 @@ fun Route.adminVideos() {
                     }
 
                     val res = Admin.getVideoAdmin(videoId)
-                    if (res != null) {
-                        call.respond(HttpStatusCode.OK, res)
+                    val resData = res.data
+                    if (resData != null) {
+                        call.respond(HttpStatusCode.OK, resData)
                     } else {
-                        call.respondText("Failed to create video record.", status = HttpStatusCode.BadRequest)
+                        call.respond(HttpStatusCode.BadRequest, res.error!!)
                     }
                 }
 
@@ -141,10 +145,11 @@ fun Route.adminVideos() {
                     }
 
                     val res = Admin.deleteVideoAdmin(videoId)
-                    if (res) {
-                        call.respond(HttpStatusCode.NoContent)
+                    val resData = res.data
+                    if (resData != null) {
+                        call.respond(HttpStatusCode.OK, resData)
                     } else {
-                        call.respondText("Failed to create video record.", status = HttpStatusCode.BadRequest)
+                        call.respond(HttpStatusCode.BadRequest, res.error!!)
                     }
                 }
 
@@ -180,13 +185,13 @@ fun Route.adminVideos() {
                         return@put
                     }
 
-                    val uploadResult = Admin.uploadVideoChunk(videoId, chunkId!!, chunkData!!)
-                    if (!uploadResult) {
-                        call.respondText("Chunk was not uploaded.", status = HttpStatusCode.BadRequest)
-                        return@put
+                    val res = Admin.uploadVideoChunk(videoId, chunkId!!, chunkData!!)
+                    val resData = res.data
+                    if (resData != null) {
+                        call.respond(HttpStatusCode.OK, resData)
+                    } else {
+                        call.respond(HttpStatusCode.BadRequest, res.error!!)
                     }
-
-                    call.respond(HttpStatusCode.OK)
                 }
             }
         }

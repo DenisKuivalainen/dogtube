@@ -2,6 +2,7 @@ package com.example.src.utils
 
 import DBHelpers
 import ioOperation
+import ioOperationWithErrorHandling
 import java.io.File
 import java.io.IOException
 import java.nio.channels.FileChannel
@@ -20,72 +21,45 @@ class FS(private val directory: String) {
         return File(directory, fileName).path
     }
 
-    suspend fun saveFile(fileName: String, content: ByteArray): Boolean = ioOperation {
-         try {
-            val file = File(directory, fileName)
-            file.writeBytes(content)
-            true
-        } catch (e: IOException) {
-            false
+    suspend fun saveFile(fileName: String, content: ByteArray) = ioOperationWithErrorHandling("Cannot save file $fileName.") {
+        val file = File(directory, fileName)
+        file.writeBytes(content)
+    }
+
+    suspend fun readFile(fileName: String): ByteArray = ioOperationWithErrorHandling("Can't read file $fileName.") {
+        val file = File(directory, fileName)
+        if(!file.exists()) {throw Exception()}
+
+        file.readBytes()
+    }
+
+    suspend fun appendFile(fileName: String, content: ByteArray) =ioOperationWithErrorHandling("Cannot append file $fileName.") {
+        val file = File(directory, fileName)
+        if (file.exists()) {
+            file.appendBytes(content)
+        } else {
+            saveFile(fileName, content)
         }
     }
 
-    suspend fun readFile(fileName: String): ByteArray? = ioOperation {
-         try {
-            val file = File(directory, fileName)
-            if (file.exists()) {
-                file.readBytes()
-            } else {
-                null
-            }
-        } catch (e: IOException) {
-            null
-        }
+    suspend fun deleteFile(fileName: String) = ioOperationWithErrorHandling("Cannot delete file $fileName") {
+        val file = File(directory, fileName)
+        file.exists() && file.delete()
     }
 
-    suspend fun appendFile(fileName: String, content: ByteArray): Boolean =ioOperation {
-         try {
-            val file = File(directory, fileName)
-            if (file.exists()) {
-                file.appendBytes(content)
-            } else {
-                saveFile(fileName, content)
-            }
-            true
-        } catch (e: IOException) {
-            false
+    suspend fun replaceBytes(filename: String, start: Int, size: Int, data: ByteArray) = ioOperationWithErrorHandling("Cannot replace bytes of file $filename.") {
+        val file = File(directory, filename)
+        if (!file.exists()) {
+            throw Exception("File does not exist")
         }
-    }
 
-    suspend fun deleteFile(fileName: String): Boolean = ioOperation {
-         try {
-            val file = File(directory, fileName)
-            file.exists() && file.delete()
-        } catch (e: IOException) {
-            false
-        }
-    }
+        val fileChannel = FileChannel.open(file.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE)
+        val mappedBuffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, start.toLong(), size.toLong())
 
-    suspend fun replaceBytes(filename: String, start: Int, size: Int, data: ByteArray): Boolean = ioOperation {
-         try {
-            val file = File(directory, filename)
-            if (!file.exists()) {
-                throw Exception("File does not exist")
-            }
+        mappedBuffer.clear()
+        mappedBuffer.put(data)
 
-            val fileChannel = FileChannel.open(file.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE)
-            val mappedBuffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, start.toLong(), size.toLong())
-
-            mappedBuffer.clear()
-            mappedBuffer.put(data)
-
-            fileChannel.close()
-
-            true
-        } catch (e: Exception) {
-            println(e)
-            false
-        }
+        fileChannel.close()
     }
 }
 
@@ -95,16 +69,16 @@ class FSHelpers {
         private val videoUploadDir = "video_src"
         private val videoDir = "video"
 
-        suspend fun saveThumbnail(id: String, data: ByteArray): Boolean = ioOperation {
-             FS(thumbnailDir).saveFile("${id}.jpg", data)
+        suspend fun saveThumbnail(id: String, data: ByteArray)  {
+              FS(thumbnailDir).saveFile("${id}.jpg", data)
         }
 
-        suspend fun createMockFile(id: String, extension: String, size: Int): Boolean = ioOperation {
+        suspend fun createMockFile(id: String, extension: String, size: Int)  {
              FS(videoUploadDir).saveFile("${id}.${extension}", ByteArray(size))
         }
 
-        suspend fun saveVideoChunkV2(chunk: DBHelpers.Companion.Chunk, fileName: String, data: ByteArray): Boolean =ioOperation {
-             FS(videoUploadDir).replaceBytes(fileName, chunk.start, chunk.chunkSize, data)
+        suspend fun saveVideoChunkV2(chunk: DBHelpers.Companion.Chunk, fileName: String, data: ByteArray)  {
+              FS(videoUploadDir).replaceBytes(fileName, chunk.start, chunk.chunkSize, data)
         }
 
         fun getVideoSrcFilePath(filename: String): String {
@@ -120,24 +94,26 @@ class FSHelpers {
             return FS(thumbnailDir).getFilePath(tempThumbnailFilename)
         }
 
-        suspend fun getTempThumbnailBytes(): ByteArray? = ioOperation {
-             FS(thumbnailDir).readFile(tempThumbnailFilename)
+        suspend fun getTempThumbnailBytes(): ByteArray {
+            return FS(thumbnailDir).readFile(tempThumbnailFilename)
         }
 
-        suspend fun deleteTempThumbnail() =ioOperation {
+        suspend fun deleteTempThumbnail() {
             FS(thumbnailDir).deleteFile(tempThumbnailFilename)
         }
 
-        suspend fun deleteSrcVideo(filename: String) = ioOperation {
-            FS(videoUploadDir).deleteFile(filename)
+        suspend fun deleteSrcVideo(filename: String)  {
+             FS(videoUploadDir).deleteFile(filename)
         }
 
-        suspend fun getThumbnail(id: String): ByteArray? = ioOperation {
-             FS(thumbnailDir).readFile("${id}.jpg")
+        suspend fun getThumbnail(id: String): ByteArray  {
+             val res = FS(thumbnailDir).readFile("${id}.jpg")
+            res ?: throw Exception()
+            return res
         }
 
-        suspend fun deleteVideos(videos: List<DBHelpers.Companion.VideoToDelete>) = ioOperation {
-            try {
+        suspend fun deleteVideos(videos: List<DBHelpers.Companion.VideoToDelete>): Boolean  {
+            return try {
                 videos.forEach { video ->
                     FS(videoDir).deleteFile("${video.id}.mp4")
                     FS(thumbnailDir).deleteFile("${video.id}.jpg")

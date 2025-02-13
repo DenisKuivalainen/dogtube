@@ -1,6 +1,7 @@
 package com.example.src.utils
 
 import ioOperation
+import ioOperationWithErrorHandling
 import java.awt.Graphics2D
 import java.awt.Image
 import java.awt.image.BufferedImage
@@ -39,31 +40,23 @@ fun processImage(input: ByteArray): ByteArray {
     return byteArrayOutputStream.toByteArray()
 }
 
-suspend fun generateThumbnail(videoId: String, srcVideoName: String): Boolean = ioOperation {
-    try {
-        val process = ProcessBuilder(
-            "ffmpeg",
-            "-i",
-            srcVideoName,
-            "-vf",
-            "select=eq(n\\,0)",
-            "-vsync",
-            "vfr",
-            "-q:v",
-            "2",
-            FSHelpers.getTempThumbnailPath()
-        ).start()
-        process.waitFor()
+suspend fun generateThumbnail(videoId: String, srcVideoName: String) = ioOperationWithErrorHandling("Cannot generate thumbnail") {
+    val process = ProcessBuilder(
+        "ffmpeg",
+        "-i",
+        srcVideoName,
+        "-vf",
+        "select=eq(n\\,0)",
+        "-vsync",
+        "vfr",
+        "-q:v",
+        "2",
+        FSHelpers.getTempThumbnailPath()
+    ).start()
+    process.waitFor()
 
-        val tempThumbnailBytes = FSHelpers.getTempThumbnailBytes()
-        if (tempThumbnailBytes == null) {
-            throw Exception("Temp Thumbnail Bytes are null.")
-        }
+    val tempThumbnailBytes = FSHelpers.getTempThumbnailBytes()
 
-        FSHelpers.deleteTempThumbnail()
-        FSHelpers.saveThumbnail(videoId, processImage(tempThumbnailBytes))
-    } catch (e: Exception) {
-        println(e.message)
-        false
-    }
+    FSHelpers.deleteTempThumbnail()
+    FSHelpers.saveThumbnail(videoId, processImage(tempThumbnailBytes))
 }
