@@ -14,7 +14,7 @@ export default () => {
 
   const loadUserData = async () => {
     try {
-      const user = await axios.get("http://0.0.0.0:4000/admin/user", {
+      const user = await axios.get("/api/admin/user", {
         headers: {
           Authorization: adminAuth.getAuthHeader(),
         },

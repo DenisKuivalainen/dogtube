@@ -62,3 +62,14 @@ CREATE TABLE sessions
     user_id     VARCHAR(255)      NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     accessed_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX idx_views_user_id ON views(user_id);
+
+CREATE INDEX idx_views_video_id ON views(video_id);
+
+CREATE INDEX idx_likes_user_id ON likes(user_id);
+
+CREATE INDEX idx_likes_video_id ON likes(video_id);
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX idx_videos_name_trgm ON videos USING GIN(name gin_trgm_ops);

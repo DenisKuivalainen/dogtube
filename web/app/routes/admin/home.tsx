@@ -30,7 +30,7 @@ export default () => {
 
   useEffect(() => {
     axios
-      .get("http://0.0.0.0:4000/admin/video", {
+      .get("/api/admin/video", {
         headers: {
           Authorization: adminAuth.getAuthHeader(),
         },
@@ -67,7 +67,7 @@ export default () => {
                 component="img"
                 alt={record.name}
                 height="240"
-                image={`http://0.0.0.0:4000/admin/video/${record.id}/thumbnail`}
+                image={`/api/admin/video/${record.id}/thumbnail`}
                 onError={(e: any) => {
                   e.target.onerror = null;
                   e.target.src = "/default.png";

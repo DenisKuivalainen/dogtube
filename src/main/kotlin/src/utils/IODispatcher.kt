@@ -11,6 +11,7 @@ suspend fun <T> ioOperationWithErrorHandling(
             fn()
         }
     } catch (e: Exception) {
+        println(e)
         throw Exception(defaultMsg, e)
     }
 }

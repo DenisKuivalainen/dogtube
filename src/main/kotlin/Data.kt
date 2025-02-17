@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 
 data class AppPrincipal(val key: String) : Principal
 data class UserPrincipal(val username: String) : Principal
+data class UserSessionPrincipal(val username: String, val session: String) : Principal
 
 @Serializable
 data class AdminUserCredentials(val username: String, val password: String)

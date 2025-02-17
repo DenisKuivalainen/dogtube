@@ -24,7 +24,7 @@ export default () => {
     setLoading(true);
     try {
       const jwt = await axios
-        .post("http://0.0.0.0:4000/admin/user/login", { username, password })
+        .post("/api/admin/user/login", { username, password })
         .then((res) => res.data.jwt);
 
       localStorage.setItem("admin_jwt", jwt);

@@ -1,6 +1,7 @@
 package com.example
 
 import com.example.src.Admin
+import com.example.src.ResponseFormat
 import com.example.src.Users
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -9,6 +10,7 @@ import io.ktor.server.auth.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.server.sessions.*
 
 private suspend inline fun ApplicationCall.handleAdminUserRequest(
     crossinline action: suspend (String, String) -> Unit
@@ -198,6 +200,27 @@ fun Route.adminVideos() {
     }
 }
 
+suspend inline fun <reified T> sessionResponseHandler(
+    call: ApplicationCall,
+    successStatus: HttpStatusCode = HttpStatusCode.OK,
+    fn: (principal: UserSessionPrincipal) -> ResponseFormat<T>,
+) {
+    val principal = call.principal<UserSessionPrincipal>()
+
+    if (principal != null) {
+        val res = fn( principal)
+        val resData = res.data
+        if (resData != null) {
+            call.sessions.set(UserSession(principal.session))
+            call.respond(successStatus, resData)
+        } else {
+            call.respond(HttpStatusCode.BadRequest, res.error!!)
+        }
+    } else {
+        call.respond(HttpStatusCode.Unauthorized, "Invalid token.")
+    }
+}
+
 fun Route.user() {
     route("user") {
         route("create") {
@@ -205,10 +228,10 @@ fun Route.user() {
                 val body = call.receive<CreateUserRequest>()
 
                 val res = Users.createUser(body.username, body.name, body.password)
-                val cookie = res.data
+                val sessionId = res.data
 
-                if (cookie != null) {
-                    call.response.cookies.append(cookie)
+                if (sessionId != null) {
+                    call.sessions.set(UserSession(sessionId))
                     call.respond(HttpStatusCode.Created)
                 } else {
                     call.respondText(res.error!!, status = HttpStatusCode.BadRequest)
@@ -221,13 +244,58 @@ fun Route.user() {
                 val body = call.receive<LoginUserRequest>()
 
                 val res = Users.loginUser(body.username, body.password)
-                val cookie = res.data
+                val sessionId = res.data
 
-                if (cookie != null) {
-                    call.response.cookies.append(cookie)
-                    call.respond(HttpStatusCode.Created)
+                if (sessionId != null) {
+                    call.sessions.set(UserSession(sessionId))
+                    call.respond(HttpStatusCode.OK)
                 } else {
                     call.respondText(res.error!!, status = HttpStatusCode.BadRequest)
+                }
+            }
+        }
+
+        authenticate("user_session") {
+            get {
+                sessionResponseHandler(call) {principal ->
+                    Users.getUserData(principal.username)
+                }
+            }
+        }
+    }
+}
+
+fun Route.videos() {
+    authenticate("user_session") {
+        route("video") {
+            get {
+                sessionResponseHandler(call) {principal ->
+                    Users.getAllVideos(principal.username)
+                }
+            }
+
+            route("{videoId}"){
+                post("view") {
+                    sessionResponseHandler(call) {principal ->
+                        Users.createVideoView(principal.username, call.parameters["videoId"]!!)
+                    }
+                }
+
+                get("thumbnail") {
+                    val principal = call.principal<UserSessionPrincipal>()
+
+                    if (principal != null) {
+                        val res = Users.getThumbnail(principal.username, call.parameters["videoId"]!!)
+                        val resData = res.data
+                        if (resData != null) {
+                            call.sessions.set(UserSession(principal.session))
+                            call.respondBytes(resData, ContentType.Image.JPEG, HttpStatusCode.OK)
+                        } else {
+                            call.respond(HttpStatusCode.BadRequest, res.error!!)
+                        }
+                    } else {
+                        call.respond(HttpStatusCode.Unauthorized, "Invalid token.")
+                    }
                 }
             }
         }

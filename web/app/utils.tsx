@@ -1,3 +1,4 @@
+import { createTheme } from "@mui/system";
 import { useLocation, useNavigate } from "react-router";
 
 export const useAdminAuth = () => {
@@ -24,6 +25,15 @@ export const useAdminAuth = () => {
   return {
     logout,
     getAuthHeader,
+  };
+};
+
+export const useUtils = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  return {
+    redirect: (path?: string) => navigate(path || "/"),
   };
 };
 
@@ -60,4 +70,16 @@ export const getFirstFrameAsBlob = (file: File): Promise<Blob> => {
 
     reader.readAsDataURL(file);
   });
+};
+
+export const darkTheme: any = {
+  palette: {
+    mode: "dark",
+    primary: {
+      main: "#90caf9",
+    },
+    secondary: {
+      main: "#f48fb1",
+    },
+  },
 };

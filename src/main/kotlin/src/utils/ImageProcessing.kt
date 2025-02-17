@@ -5,6 +5,8 @@ import ioOperationWithErrorHandling
 import java.awt.Graphics2D
 import java.awt.Image
 import java.awt.image.BufferedImage
+import java.awt.image.ConvolveOp
+import java.awt.image.Kernel
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import javax.imageio.ImageIO
@@ -12,7 +14,7 @@ import javax.imageio.ImageIO
 private val height = 240
 private val width = 320
 
-fun processImage(input: ByteArray): ByteArray {
+suspend fun processImage(input: ByteArray): ByteArray = ioOperation {
     val image = ImageIO.read(ByteArrayInputStream(input))
 
     val scaledWidth: Int
@@ -37,26 +39,53 @@ fun processImage(input: ByteArray): ByteArray {
 
     val byteArrayOutputStream = ByteArrayOutputStream()
     ImageIO.write(croppedImage, "jpg", byteArrayOutputStream)
-    return byteArrayOutputStream.toByteArray()
+    byteArrayOutputStream.toByteArray()
 }
 
-suspend fun generateThumbnail(videoId: String, srcVideoName: String) = ioOperationWithErrorHandling("Cannot generate thumbnail") {
-    val process = ProcessBuilder(
-        "ffmpeg",
-        "-i",
-        srcVideoName,
-        "-vf",
-        "select=eq(n\\,0)",
-        "-vsync",
-        "vfr",
-        "-q:v",
-        "2",
-        FSHelpers.getTempThumbnailPath()
-    ).start()
-    process.waitFor()
+suspend fun generateThumbnail(videoId: String, srcVideoName: String) =
+    ioOperationWithErrorHandling("Cannot generate thumbnail") {
+        val process = ProcessBuilder(
+            "ffmpeg",
+            "-i",
+            srcVideoName,
+            "-vf",
+            "select=eq(n\\,0)",
+            "-vsync",
+            "vfr",
+            "-q:v",
+            "2",
+            FSHelpers.getTempThumbnailPath()
+        ).start()
+        process.waitFor()
 
-    val tempThumbnailBytes = FSHelpers.getTempThumbnailBytes()
+        val tempThumbnailBytes = FSHelpers.getTempThumbnailBytes()
 
-    FSHelpers.deleteTempThumbnail()
-    FSHelpers.saveThumbnail(videoId, processImage(tempThumbnailBytes))
+        FSHelpers.deleteTempThumbnail()
+        FSHelpers.saveThumbnail(videoId, processImage(tempThumbnailBytes))
+    }
+
+suspend fun blurImage(inputImage: ByteArray): ByteArray = ioOperation {
+    val inputStream = ByteArrayInputStream(inputImage)
+    val image: BufferedImage = ImageIO.read(inputStream)
+
+    val kernelSize = 20
+    val kernel = FloatArray(kernelSize * kernelSize) { 1f / (kernelSize * kernelSize) } // Average blur
+    val convolveOp = ConvolveOp(Kernel(kernelSize, kernelSize, kernel))
+
+    val blurredImage = convolveOp.filter(image, null)
+
+    val width = blurredImage.width
+    val height = blurredImage.height
+    val newWidth = (width * 0.9).toInt()
+    val newHeight = (height * 0.9).toInt()
+
+    val xOffset = (width - newWidth) / 2
+    val yOffset = (height - newHeight) / 2
+
+    val croppedImage = blurredImage.getSubimage(xOffset, yOffset, newWidth, newHeight)
+
+    val outputStream = ByteArrayOutputStream()
+    ImageIO.write(croppedImage, "jpg", outputStream)
+
+    outputStream.toByteArray()
 }

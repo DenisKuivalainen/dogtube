@@ -15,6 +15,8 @@ fun Application.configureRouting() {
         helloWorld()
         adminUser()
         adminVideos()
+        user()
+        videos()
 
         staticResources("/static", "static")
     }

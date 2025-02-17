@@ -40,7 +40,7 @@ export default () => {
 
   useEffect(() => {
     axios
-      .get(`http://0.0.0.0:4000/admin/video/${videoId}`, {
+      .get(`/api/admin/video/${videoId}`, {
         headers: {
           Authorization: adminAuth.getAuthHeader(),
         },
@@ -67,7 +67,7 @@ export default () => {
       setLoadingMsg("Deleting...");
 
       await Promise.all([
-        axios.delete(`http://0.0.0.0:4000/admin/video/${videoId}`, {
+        axios.delete(`/api/admin/video/${videoId}`, {
           headers: {
             Authorization: adminAuth.getAuthHeader(),
           },

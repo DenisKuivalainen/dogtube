@@ -51,13 +51,13 @@ object Users : TableImpl<Record>(DSL.name("users")) {
     val NAME: Field<String> = DSL.field(DSL.name("name"), String::class.java)
     val PASSWORD: Field<String> = DSL.field(DSL.name("password"), String::class.java)
     val SUBSCRIPTIONLEVEL: Field<String> = DSL.field(DSL.name("subscription_level"), String::class.java)
-    val SUBSCRIPTIONTILL: Field<Timestamp> = DSL.field(DSL.name("subscription_till"), Timestamp::class.java)
+    val SUBSCRIPTIONTILL: Field<Timestamp?> = DSL.field(DSL.name("subscription_till"), Timestamp::class.java)
     val CREATEDAT: Field<Timestamp> = DSL.field(DSL.name("created_at"), Timestamp::class.java)
     val UPDATEDAT: Field<Timestamp> = DSL.field(DSL.name("updated_at"), Timestamp::class.java)
 }
 
 object Sessions : TableImpl<Record>(DSL.name("sessions")) {
     val ID: Field<UUID> = DSL.field(DSL.name("id"), UUID::class.java)
-    val USERID: Field<String> = DSL.field(DSL.name("id"), String::class.java)
+    val USERID: Field<String> = DSL.field(DSL.name("user_id"), String::class.java)
     val ACCESSEDAT: Field<Timestamp> = DSL.field(DSL.name("accessed_at"), Timestamp::class.java)
 }

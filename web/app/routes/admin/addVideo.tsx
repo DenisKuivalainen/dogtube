@@ -56,7 +56,7 @@ export default () => {
 
       const { id: videoId, chunks } = await axios
         .post(
-          "http://0.0.0.0:4000/admin/video",
+          "/api/admin/video",
           {
             name: title,
             isPremium,
@@ -84,16 +84,12 @@ export default () => {
         chunkFormData.append("chunk", chunkData);
         chunkFormData.append("chunkId", chunk.id);
 
-        await axios.put(
-          `http://0.0.0.0:4000/admin/video/${videoId}`,
-          chunkFormData,
-          {
-            headers: {
-              "Content-Type": "multipart/form-data",
-              Authorization: adminAuth.getAuthHeader(),
-            },
-          }
-        );
+        await axios.put(`/api/admin/video/${videoId}`, chunkFormData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Authorization: adminAuth.getAuthHeader(),
+          },
+        });
         increaseStatus();
       }
 

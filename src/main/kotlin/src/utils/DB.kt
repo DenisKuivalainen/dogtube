@@ -104,7 +104,8 @@ class DBHelpers {
 
         suspend fun setVideoReady(id: UUID) = ioOperationWithErrorHandling("Cannot set video status ready.") {
             db.getDSLContext().update(Videos).set(Videos.STATUS, VideoStatus.READY.value)
-                .set(Videos.UPLOADEDAT, Timestamp(System.currentTimeMillis())).where(Videos.ID.eq(id)).execute()
+                .set(Videos.UPLOADEDAT, Timestamp(System.currentTimeMillis())).where(Videos.ID.eq(id))
+                .and(Videos.STATUS.ne(VideoStatus.READY.value)).execute()
         }
 
         suspend fun getVideo(id: UUID): Record = ioOperationWithErrorHandling("Cannot get video info.") {
@@ -306,12 +307,12 @@ class DBHelpers {
         )
 
         suspend fun getUser(username: String): User = ioOperationWithErrorHandling("Cannot get user.") {
-            db.getDSLContext().select().from(Users).where(Users.ID.eq(username)).fetchOne { record ->
+            db.getDSLContext().select(Users.asterisk()).from(Users).where(Users.ID.eq(username)).fetchOne { record ->
                 User(
                     id = record[Users.ID],
                     name = record[Users.NAME],
                     subscription_level = record[Users.SUBSCRIPTIONLEVEL],
-                    subscription_till = record[Users.SUBSCRIPTIONTILL].toString()
+                    subscription_till = record[Users.SUBSCRIPTIONTILL]?.toString()
                 )
             } ?: throw Exception()
         }
@@ -330,9 +331,88 @@ class DBHelpers {
         suspend fun createSession(username: String): String = ioOperationWithErrorHandling("Cannot create a session.") {
             val id = UUID.randomUUID()
 
-            db.getDSLContext().insertInto(Sessions).columns(Sessions.ID, Sessions.USERID).values(id, username)
+            db.getDSLContext().insertInto(Sessions).columns(Sessions.ID, Sessions.USERID).values(id, username).execute()
 
             id.toString()
         }
+
+        suspend fun getSession(sessionId: UUID): String = ioOperationWithErrorHandling("Cannot find the session.") {
+            val username =
+                db.getDSLContext().select(Sessions.USERID).from(Sessions).where(Sessions.ID.eq(sessionId)).and(
+                        Sessions.ACCESSEDAT.greaterThan(
+                            DSL.field(
+                                "NOW() -  INTERVAL '30 minutes'", Timestamp::class.java
+                            )
+                        )
+                    ).fetchOne { record -> record[Sessions.USERID].toString() }
+            username ?: throw Exception()
+
+            db.getDSLContext().update(Sessions).set(Sessions.ACCESSEDAT, DSL.currentTimestamp())
+                .where(Sessions.USERID.eq(username)).execute()
+
+            username
+        }
+
+        @Serializable
+        data class VideoData(
+            val id: String,
+            val name: String,
+            val createdAt: String,
+            val uploadedAt: String,
+            val status: String,
+            val isPremium: Boolean,
+            val views: Int,
+            val likes: Int,
+            val viewed: Boolean,
+            val liked: Boolean
+        )
+
+        suspend fun getAllVideos(username: String, searchText: String?): List<VideoData> =
+            ioOperationWithErrorHandling("Cannot get all videos for admin.") {
+                val views = DSL.field("COUNT(DISTINCT views.user_id) AS unique_views")
+                val likes = DSL.field("COUNT(likes.user_id) AS likes")
+                val viewed = DSL.field("COUNT(*) FILTER (WHERE views.user_id = ?) > 0 AS viewed", username)
+                val liked = DSL.field("COUNT(*) FILTER (WHERE likes.user_id = ?) > 0 AS liked", username)
+
+                val query = db.getDSLContext().select(
+                    Videos.ID,
+                    Videos.NAME,
+                    Videos.CREATEDAT,
+                    Videos.UPLOADEDAT,
+                    Videos.STATUS,
+                    Videos.ISPREMIUM,
+                    views,
+                    likes,
+                    viewed,
+                    liked
+                ).from(Videos).leftJoin(Views).on("videos.id = views.video_id").leftJoin(Likes)
+                    .on("videos.id = likes.video_id")
+                    .where(Videos.STATUS.eq(VideoStatus.READY.value))
+
+                if (searchText != null) query.and(Videos.NAME.likeIgnoreCase("%$searchText%"))
+
+                query.groupBy(DSL.field("videos.id")).orderBy(Videos.UPLOADEDAT.desc())
+
+                query.fetch { record ->
+                    VideoData(
+                        id = record[Videos.ID].toString(),
+                        name = record[Videos.NAME],
+                        createdAt = record[Videos.CREATEDAT].toString(),
+                        uploadedAt = record[Videos.UPLOADEDAT].toString(),
+                        status = record[Videos.STATUS],
+                        isPremium = record[Videos.ISPREMIUM],
+                        views = record[views, Int::class.java] ?: 0,
+                        likes = record[likes, Int::class.java] ?: 0,
+                        viewed = record[viewed, Boolean::class.java] ?: false,
+                        liked = record[liked, Boolean::class.java] ?: false
+                    )
+                }
+            }
+
+        suspend fun createVideoView(username: String, videoId: UUID) =
+            ioOperationWithErrorHandling("Cannot create a video view.") {
+                db.getDSLContext().insertInto(Views).columns(Views.USERID, Views.VIDEOID).values(username, videoId)
+                    .execute()
+            }
     }
 }

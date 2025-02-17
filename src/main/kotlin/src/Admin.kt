@@ -20,13 +20,14 @@ class Admin {
         suspend fun createAdminUser(username: String, password: String) = response {
             try {
                 DBHelpers.getAdminUser(username)
-                throw Exception("User already exists.")
             } catch (_: Exception) {
                 // If user was not found
 
                 val hashedPassword = Crypt.hashPassword(password)
-                DBHelpers.createAdminUser(username, hashedPassword)
+                return@response DBHelpers.createAdminUser(username, hashedPassword)
             }
+
+            throw Exception("User already exists.")
         }
 
         @Serializable
