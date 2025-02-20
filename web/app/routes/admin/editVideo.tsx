@@ -61,6 +61,36 @@ export default () => {
   const [loadingCompleted, setLoadingCompleted] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
 
+  const handleUpdate = async () => {
+    try {
+      setIsLoading(true);
+      setLoadingMsg("Updating...");
+
+      await Promise.all([
+        axios.patch(
+          `/api/admin/video/${videoId}`,
+          {
+            name: videoData.name,
+            isPremium: videoData.isPremium,
+          },
+          {
+            headers: {
+              Authorization: adminAuth.getAuthHeader(),
+            },
+          }
+        ),
+        new Promise((resolve) => setTimeout(resolve, 1500)),
+      ]);
+
+      setLoadingCompleted(true);
+      setLoadingMsg("Update completed!");
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      navigate("/admin");
+    } catch (e: any) {
+      setIsLoading(false);
+      window.alert(e.message);
+    }
+  };
   const handleDelete = async () => {
     try {
       setIsLoading(true);
@@ -77,7 +107,7 @@ export default () => {
 
       setLoadingCompleted(true);
       setLoadingMsg("Deletion completed!");
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
       navigate("/admin");
     } catch (e: any) {
       setIsLoading(false);
@@ -173,7 +203,12 @@ export default () => {
             label="Premium"
           />
 
-          <Button variant="contained" color="primary" sx={{ marginBottom: 2 }}>
+          <Button
+            variant="contained"
+            color="primary"
+            sx={{ marginBottom: 2 }}
+            onClick={handleUpdate}
+          >
             Save Changes
           </Button>
 

@@ -3,7 +3,9 @@ package com.example.src
 import DBHelpers
 import VideoStatus
 import com.example.src.utils.*
+import io.ktor.http.content.*
 import kotlinx.serialization.Serializable
+import java.io.InputStream
 import java.util.*
 
 class Admin {
@@ -101,6 +103,44 @@ class Admin {
 
         suspend fun deleteVideoAdmin(id: String) = response {
             DBHelpers.updateVideoSatus(UUID.fromString(id), VideoStatus.DELETING)
+        }
+
+        suspend fun uploadVideoV2(multipartData: MultiPartData) = response {
+            val id = UUID.randomUUID()
+
+            var name: String? = null
+            var isPremium: Boolean = false
+            var extension: String? = null
+
+            multipartData.forEachPart { part ->
+                when (part) {
+                    is PartData.FormItem -> {
+                        when (part.name) {
+                            "name" -> name = part.value
+                            "isPremium" -> isPremium = part.value.toBooleanStrictOrNull() ?: false
+                        }
+                    }
+
+                    is PartData.FileItem -> {
+                        if(extension == null) {
+                            extension = part.originalFileName?.split(".")?.getOrNull(1)
+                        }
+                        extension = part.originalFileName ?: "uploaded_file"
+                        FSHelpers.writeVideoAsStream("$id.$extension", part.streamProvider())
+                    }
+
+                    else -> Unit
+                }
+                part.dispose()
+            }
+            if (name == null || extension == null) throw Exception("required payload can not be null.")
+
+            DBHelpers.createVideoV2(id, extension!!, name!!, isPremium)
+            addToProcessingQueue(id.toString())
+        }
+
+        suspend fun editVideo(id: String,  name: String?, isPremium: Boolean?) = response {
+            DBHelpers.editVideoAdmin(UUID.fromString(id), name, isPremium)
         }
     }
 

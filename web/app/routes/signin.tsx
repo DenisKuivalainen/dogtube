@@ -6,11 +6,13 @@ import {
   CssBaseline,
   ThemeProvider,
   createTheme,
+  Link,
 } from "@mui/material";
 import { useForm } from "react-hook-form";
 import type { Route } from "../+types/root";
 import axios from "axios";
 import { darkTheme, useUtils } from "~/utils";
+import { useEffect } from "react";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -30,18 +32,21 @@ export default () => {
   const { redirect } = useUtils();
   const theme = createTheme(darkTheme);
 
+  useEffect(() => {
+    axios
+      .get("api/user", {
+        withCredentials: true,
+      })
+      .then(() => redirect("/"))
+      .catch(() => {});
+  }, []);
+
   const onSubmit = async (data: any) => {
     try {
-      await axios.post(
-        "api/user/login",
-        {
-          username: data.username,
-          password: data.password,
-        },
-        {
-          withCredentials: true,
-        }
-      );
+      await axios.post("api/user/login", {
+        username: data.username,
+        password: data.password,
+      });
 
       redirect();
     } catch (e: any) {
@@ -105,6 +110,16 @@ export default () => {
           >
             Sign Up
           </Button>
+          <Typography variant="body2" sx={{ mt: 2, textAlign: "center" }}>
+            Don't have an account?{" "}
+            <Link
+              href="/signup"
+              color="primary"
+              sx={{ textDecoration: "none" }}
+            >
+              Create new account
+            </Link>
+          </Typography>
         </Box>
       </Box>
     </ThemeProvider>

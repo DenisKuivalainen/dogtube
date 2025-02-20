@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import type { Route } from "./+types/home";
-import { useOutletContext } from "react-router";
+import { useOutletContext, useSearchParams } from "react-router";
 import axios from "axios";
 import {
+  Box,
   Card,
   CardContent,
   CardMedia,
@@ -12,7 +13,6 @@ import {
 } from "@mui/material";
 import { Favorite, Star, Visibility } from "@mui/icons-material";
 import { useUtils } from "~/utils";
-import video from "./video";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -26,16 +26,20 @@ export default () => {
   const { redirect } = useUtils();
 
   const [videos, setVideos] = useState<any[]>([]);
+  const [searchParams] = useSearchParams();
+  const search = decodeURIComponent(searchParams.get("search") || "");
 
   const fetchVideos = async () => {
-    const res = await axios.get("/api/video", { withCredentials: true });
+    const res = await axios.get(`/api/video?search=${search}`, {
+      withCredentials: true,
+    });
 
     setVideos(res.data);
   };
 
   useEffect(() => {
     fetchVideos();
-  }, []);
+  }, [search]);
 
   const [videoClicked, setVideoClicked] = useState(false);
   const handleVideoClick =
@@ -62,11 +66,28 @@ export default () => {
           md={3}
           key={video.id}
           onClick={handleVideoClick(video.id, video.isPremium)}
-          style={{
-            cursor: "pointer",
-          }}
+          style={{ cursor: "pointer" }}
         >
-          <Card>
+          <Card sx={{ position: "relative" }}>
+            {/* {video.isPremium && userData.subscription_level !== "PREMIUM" && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  width: "100%",
+                  top: 8,
+                  color: "secondary.main",
+                  px: 1,
+                  py: 0.5,
+                  borderRadius: 1,
+                  fontSize: "0.75rem",
+                  fontWeight: "bold",
+                  textAlign: "right",
+                }}
+              >
+                Premium
+              </Box>
+            )} */}
+
             <CardMedia
               component="img"
               height="240"
@@ -81,7 +102,7 @@ export default () => {
               <Grid container alignItems="center">
                 {/* Star icon for premium videos */}
                 {video.isPremium &&
-                  userData.subscription_level != "PREMIUM" && (
+                  userData.subscription_level !== "PREMIUM" && (
                     <Star color="secondary" style={{ marginRight: 8 }} />
                   )}
 

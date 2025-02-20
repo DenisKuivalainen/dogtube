@@ -46,7 +46,7 @@ fun Route.adminUser() {
                     if (resData != null) {
                         call.respond(HttpStatusCode.OK, resData)
                     } else {
-                        call.respond(HttpStatusCode.BadRequest, res.error!!)
+                        call.respond(HttpStatusCode.InternalServerError, res.error!!)
                     }
                 } else {
                     call.respond(HttpStatusCode.Unauthorized, "Invalid token.")
@@ -62,7 +62,7 @@ fun Route.adminUser() {
                     if (resData != null) {
                         call.respond(HttpStatusCode.Created, resData)
                     } else {
-                        call.respond(HttpStatusCode.BadRequest, res.error!!)
+                        call.respond(HttpStatusCode.InternalServerError, res.error!!)
                     }
                 }
             }
@@ -75,7 +75,7 @@ fun Route.adminUser() {
                 if (resData != null) {
                     call.respond(HttpStatusCode.OK, resData)
                 } else {
-                    call.respond(HttpStatusCode.BadRequest, res.error!!)
+                    call.respond(HttpStatusCode.InternalServerError, res.error!!)
                 }
             }
         }
@@ -95,7 +95,7 @@ fun Route.adminVideos() {
         if (resData != null) {
             call.respondBytes(resData, ContentType.Image.JPEG, HttpStatusCode.OK)
         } else {
-            call.respond(HttpStatusCode.BadRequest, res.error!!)
+            call.respond(HttpStatusCode.InternalServerError, res.error!!)
         }
     }
 
@@ -107,7 +107,7 @@ fun Route.adminVideos() {
                 if (resData != null) {
                     call.respond(HttpStatusCode.OK, resData)
                 } else {
-                    call.respond(HttpStatusCode.BadRequest, res.error!!)
+                    call.respond(HttpStatusCode.InternalServerError, res.error!!)
                 }
             }
 
@@ -118,7 +118,17 @@ fun Route.adminVideos() {
                 if (resData != null) {
                     call.respond(HttpStatusCode.OK, resData)
                 } else {
-                    call.respond(HttpStatusCode.BadRequest, res.error!!)
+                    call.respond(HttpStatusCode.InternalServerError, res.error!!)
+                }
+            }
+
+            post("v2") { // Save a video as stream
+                val res = Admin.uploadVideoV2(call.receiveMultipart())
+                val resData = res.data
+                if (resData != null) {
+                    call.respond(HttpStatusCode.Created, resData)
+                } else {
+                    call.respond(HttpStatusCode.InternalServerError, res.error!!)
                 }
             }
 
@@ -135,7 +145,7 @@ fun Route.adminVideos() {
                     if (resData != null) {
                         call.respond(HttpStatusCode.OK, resData)
                     } else {
-                        call.respond(HttpStatusCode.BadRequest, res.error!!)
+                        call.respond(HttpStatusCode.InternalServerError, res.error!!)
                     }
                 }
 
@@ -151,7 +161,7 @@ fun Route.adminVideos() {
                     if (resData != null) {
                         call.respond(HttpStatusCode.OK, resData)
                     } else {
-                        call.respond(HttpStatusCode.BadRequest, res.error!!)
+                        call.respond(HttpStatusCode.InternalServerError, res.error!!)
                     }
                 }
 
@@ -192,7 +202,27 @@ fun Route.adminVideos() {
                     if (resData != null) {
                         call.respond(HttpStatusCode.OK, resData)
                     } else {
-                        call.respond(HttpStatusCode.BadRequest, res.error!!)
+                        call.respond(HttpStatusCode.InternalServerError, res.error!!)
+                    }
+                }
+
+                patch {
+                    val videoId = call.parameters["id"]
+                    val body = call.receive<EditVideoRequest>()
+                    val name = body.name
+                    val isPremium = body.isPremium
+
+                    if (videoId == null || isPremium == null && name == null) {
+                        call.respondText("Missing chunk data or metadata.", status = HttpStatusCode.BadRequest)
+                        return@patch
+                    }
+
+                    val res = Admin.editVideo(videoId, name, isPremium)
+                    val resData = res.data
+                    if (resData != null) {
+                        call.respond(HttpStatusCode.OK, resData)
+                    } else {
+                        call.respond(HttpStatusCode.InternalServerError, res.error!!)
                     }
                 }
             }
@@ -208,13 +238,13 @@ suspend inline fun <reified T> sessionResponseHandler(
     val principal = call.principal<UserSessionPrincipal>()
 
     if (principal != null) {
-        val res = fn( principal)
+        val res = fn(principal)
         val resData = res.data
         if (resData != null) {
             call.sessions.set(UserSession(principal.session))
             call.respond(successStatus, resData)
         } else {
-            call.respond(HttpStatusCode.BadRequest, res.error!!)
+            call.respond(HttpStatusCode.InternalServerError, res.error!!)
         }
     } else {
         call.respond(HttpStatusCode.Unauthorized, "Invalid token.")
@@ -234,7 +264,7 @@ fun Route.user() {
                     call.sessions.set(UserSession(sessionId))
                     call.respond(HttpStatusCode.Created)
                 } else {
-                    call.respondText(res.error!!, status = HttpStatusCode.BadRequest)
+                    call.respondText(res.error!!, status = HttpStatusCode.InternalServerError)
                 }
             }
         }
@@ -250,15 +280,32 @@ fun Route.user() {
                     call.sessions.set(UserSession(sessionId))
                     call.respond(HttpStatusCode.OK)
                 } else {
-                    call.respondText(res.error!!, status = HttpStatusCode.BadRequest)
+                    call.respondText(res.error!!, status = HttpStatusCode.InternalServerError)
                 }
             }
         }
 
         authenticate("user_session") {
             get {
-                sessionResponseHandler(call) {principal ->
+                sessionResponseHandler(call) { principal ->
                     Users.getUserData(principal.username)
+                }
+            }
+
+            route("logout") {
+                post {
+                    val principal = call.principal<UserSessionPrincipal>()
+
+                    if (principal == null) {
+                        call.respond(HttpStatusCode.Unauthorized, "Not authenticated")
+                        return@post
+                    }
+
+                    val sessionId = principal.session
+
+                    Users.logoutUser(sessionId)
+                    call.sessions.clear<UserSession>()
+                    call.respond(HttpStatusCode.OK)
                 }
             }
         }
@@ -269,14 +316,14 @@ fun Route.videos() {
     authenticate("user_session") {
         route("video") {
             get {
-                sessionResponseHandler(call) {principal ->
-                    Users.getAllVideos(principal.username)
+                sessionResponseHandler(call) { principal ->
+                    Users.getAllVideos(principal.username, call.request.queryParameters["search"])
                 }
             }
 
-            route("{videoId}"){
+            route("{videoId}") {
                 post("view") {
-                    sessionResponseHandler(call) {principal ->
+                    sessionResponseHandler(call) { principal ->
                         Users.createVideoView(principal.username, call.parameters["videoId"]!!)
                     }
                 }
@@ -291,7 +338,7 @@ fun Route.videos() {
                             call.sessions.set(UserSession(principal.session))
                             call.respondBytes(resData, ContentType.Image.JPEG, HttpStatusCode.OK)
                         } else {
-                            call.respond(HttpStatusCode.BadRequest, res.error!!)
+                            call.respond(HttpStatusCode.InternalServerError, res.error!!)
                         }
                     } else {
                         call.respond(HttpStatusCode.Unauthorized, "Invalid token.")

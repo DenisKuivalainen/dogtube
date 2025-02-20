@@ -1,12 +1,14 @@
-import { AccountCircle, Pets, Star } from "@mui/icons-material";
+import { AccountCircle, Pets, Search, Star } from "@mui/icons-material";
 import {
   AppBar,
   Box,
   Button,
   CssBaseline,
   IconButton,
+  InputAdornment,
   Menu,
   MenuItem,
+  TextField,
   ThemeProvider,
   Toolbar,
   Typography,
@@ -14,7 +16,7 @@ import {
 } from "@mui/material";
 import axios from "axios";
 import { useEffect, useState } from "react";
-import { Outlet } from "react-router";
+import { Outlet, useSearchParams } from "react-router";
 import { darkTheme, useUtils } from "~/utils";
 
 const Navbar = ({
@@ -30,21 +32,25 @@ const Navbar = ({
   onLogout?: () => void | Promise<void>;
   onSettings?: () => void | Promise<void>;
 }) => {
-  // State for the user menu
   const [anchorEl, setAnchorEl] = useState(null);
   const openMenu = Boolean(anchorEl);
 
-  // Handle menu open
+  const [searchParams] = useSearchParams();
+  const [seach, setSearch] = useState<string>("");
+  useEffect(() => {
+    setSearch(decodeURIComponent(searchParams.get("search") || ""));
+  }, [searchParams]);
+
+  const { redirect } = useUtils();
+
   const handleMenuClick = (event: any) => {
     setAnchorEl(event.currentTarget);
   };
 
-  // Handle menu close
   const handleMenuClose = () => {
     setAnchorEl(null);
   };
 
-  // Handle specific menu item click
   const handleUpgradeClick = () => {
     onUpgrade();
     handleMenuClose();
@@ -60,6 +66,10 @@ const Navbar = ({
     handleMenuClose();
   };
 
+  const handleSearch = () => {
+    redirect(`/?search=${encodeURIComponent(seach)}`);
+  };
+
   return (
     <AppBar position="sticky">
       <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
@@ -70,29 +80,33 @@ const Navbar = ({
           TUBE
         </Typography>
 
-        {/* Middle: "Upgrade to premium" */}
-        {!isPremium && (
-          <Box
-            sx={{
-              flexGrow: 1,
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
+        <Box
+          sx={{
+            flexGrow: 1,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <TextField
+            variant="outlined"
+            size="small"
+            placeholder="Search dog videos..."
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton onClick={handleSearch} edge="end">
+                    <Search />
+                  </IconButton>
+                </InputAdornment>
+              ),
             }}
-          >
-            <Typography variant="body1" sx={{ marginRight: 1 }}>
-              Upgrade to premium today!
-            </Typography>
-            <Button
-              variant="contained"
-              onClick={onUpgrade}
-              size="small"
-              color="secondary"
-            >
-              Upgrade
-            </Button>
-          </Box>
-        )}
+            sx={{ width: "50%", bgcolor: "background.paper", borderRadius: 1 }}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            value={seach}
+          />
+        </Box>
 
         {/* Right Side: User icon and name */}
         <Box>
@@ -116,16 +130,6 @@ const Navbar = ({
               horizontal: "right",
             }}
           >
-            {/* Upgrade to Premium if not already premium */}
-            {!isPremium && (
-              <MenuItem
-                onClick={handleUpgradeClick}
-                sx={{ color: "secondary.main" }}
-              >
-                <Star sx={{ marginRight: 1 }} /> Upgrade to premium
-              </MenuItem>
-            )}
-
             {/* Settings */}
             <MenuItem onClick={handleSettingsClick}>Settings</MenuItem>
 
@@ -176,6 +180,14 @@ export default () => {
           <Navbar
             isPremium={userData.subscription_level == "PREMIUM"}
             username={userData.name}
+            onLogout={() => {
+              axios
+                .post("api/user/logout", {
+                  withCredentials: true,
+                })
+                .then(() => redirect("/signin"));
+            }}
+            onUpgrade={() => redirect("/subscription")}
           />{" "}
           <Outlet context={{ userData }} />
         </>

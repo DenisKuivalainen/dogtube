@@ -41,6 +41,10 @@ class Users {
             DBHelpers.createSession(username)
         }
 
+        suspend fun logoutUser(sessionId: String) = response {
+            DBHelpers.deleteSession(UUID.fromString(sessionId))
+        }
+
         suspend fun validateSession(sessionId: String) = response<String> {
             DBHelpers.getSession(UUID.fromString(sessionId))
         }

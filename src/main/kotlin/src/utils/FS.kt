@@ -1,16 +1,17 @@
 package com.example.src.utils
 
 import DBHelpers
-import ioOperation
 import ioOperationWithErrorHandling
+import java.io.ByteArrayInputStream
 import java.io.File
-import java.io.IOException
+import java.io.FileOutputStream
+import java.io.InputStream
 import java.nio.channels.FileChannel
 import java.nio.file.StandardOpenOption
 
 class FS(private val directory: String) {
 
-    init{
+    init {
         val dir = File(directory)
         if (!dir.exists()) {
             dir.mkdirs()
@@ -21,46 +22,58 @@ class FS(private val directory: String) {
         return File(directory, fileName).path
     }
 
-    suspend fun saveFile(fileName: String, content: ByteArray) = ioOperationWithErrorHandling("Cannot save file $fileName.") {
-        val file = File(directory, fileName)
-        file.writeBytes(content)
-    }
+    suspend fun saveFile(fileName: String, content: ByteArray) =
+        ioOperationWithErrorHandling("Cannot save file $fileName.") {
+            val file = File(directory, fileName)
+            file.writeBytes(content)
+        }
 
     suspend fun readFile(fileName: String): ByteArray = ioOperationWithErrorHandling("Can't read file $fileName.") {
         val file = File(directory, fileName)
-        if(!file.exists()) {throw Exception()}
+        if (!file.exists()) {
+            throw Exception()
+        }
 
         file.readBytes()
     }
 
-    suspend fun appendFile(fileName: String, content: ByteArray) =ioOperationWithErrorHandling("Cannot append file $fileName.") {
-        val file = File(directory, fileName)
-        if (file.exists()) {
-            file.appendBytes(content)
-        } else {
-            saveFile(fileName, content)
+    suspend fun appendFile(fileName: String, content: ByteArray) =
+        ioOperationWithErrorHandling("Cannot append file $fileName.") {
+            val file = File(directory, fileName)
+            if (file.exists()) {
+                file.appendBytes(content)
+            } else {
+                saveFile(fileName, content)
+            }
         }
-    }
 
     suspend fun deleteFile(fileName: String) = ioOperationWithErrorHandling("Cannot delete file $fileName") {
         val file = File(directory, fileName)
         file.exists() && file.delete()
     }
 
-    suspend fun replaceBytes(filename: String, start: Int, size: Int, data: ByteArray) = ioOperationWithErrorHandling("Cannot replace bytes of file $filename.") {
-        val file = File(directory, filename)
-        if (!file.exists()) {
-            throw Exception("File does not exist")
+    suspend fun replaceBytes(filename: String, start: Int, size: Int, data: ByteArray) =
+        ioOperationWithErrorHandling("Cannot replace bytes of file $filename.") {
+            val file = File(directory, filename)
+            if (!file.exists()) {
+                throw Exception("File does not exist")
+            }
+
+            val fileChannel = FileChannel.open(file.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE)
+            val mappedBuffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, start.toLong(), size.toLong())
+
+            mappedBuffer.clear()
+            mappedBuffer.put(data)
+
+            fileChannel.close()
         }
 
-        val fileChannel = FileChannel.open(file.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE)
-        val mappedBuffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, start.toLong(), size.toLong())
-
-        mappedBuffer.clear()
-        mappedBuffer.put(data)
-
-        fileChannel.close()
-    }
+    suspend fun writeFileStream(fileName: String, stream: InputStream) =
+        ioOperationWithErrorHandling("Cannot write file $fileName.") {
+            FileOutputStream(File(directory, fileName)).use { outputStream ->
+                stream.copyTo(outputStream)
+            }
+        }
 }
 
 class FSHelpers {
@@ -69,16 +82,16 @@ class FSHelpers {
         private val videoUploadDir = "video_src"
         private val videoDir = "video"
 
-        suspend fun saveThumbnail(id: String, data: ByteArray)  {
-              FS(thumbnailDir).saveFile("${id}.jpg", data)
+        suspend fun saveThumbnail(id: String, data: ByteArray) {
+            FS(thumbnailDir).saveFile("${id}.jpg", data)
         }
 
-        suspend fun createMockFile(id: String, extension: String, size: Int)  {
-             FS(videoUploadDir).saveFile("${id}.${extension}", ByteArray(size))
+        suspend fun createMockFile(id: String, extension: String, size: Int) {
+            FS(videoUploadDir).saveFile("${id}.${extension}", ByteArray(size))
         }
 
-        suspend fun saveVideoChunkV2(chunk: DBHelpers.Companion.Chunk, fileName: String, data: ByteArray)  {
-              FS(videoUploadDir).replaceBytes(fileName, chunk.start, chunk.chunkSize, data)
+        suspend fun saveVideoChunkV2(chunk: DBHelpers.Companion.Chunk, fileName: String, data: ByteArray) {
+            FS(videoUploadDir).replaceBytes(fileName, chunk.start, chunk.chunkSize, data)
         }
 
         fun getVideoSrcFilePath(filename: String): String {
@@ -102,17 +115,17 @@ class FSHelpers {
             FS(thumbnailDir).deleteFile(tempThumbnailFilename)
         }
 
-        suspend fun deleteSrcVideo(filename: String)  {
-             FS(videoUploadDir).deleteFile(filename)
+        suspend fun deleteSrcVideo(filename: String) {
+            FS(videoUploadDir).deleteFile(filename)
         }
 
-        suspend fun getThumbnail(id: String): ByteArray  {
-             val res = FS(thumbnailDir).readFile("${id}.jpg")
-            res ?: throw Exception()
+        suspend fun getThumbnail(id: String): ByteArray {
+            val res = FS(thumbnailDir).readFile("${id}.jpg")
+            res
             return res
         }
 
-        suspend fun deleteVideos(videos: List<DBHelpers.Companion.VideoToDelete>): Boolean  {
+        suspend fun deleteVideos(videos: List<DBHelpers.Companion.VideoToDelete>): Boolean {
             return try {
                 videos.forEach { video ->
                     FS(videoDir).deleteFile("${video.id}.mp4")
@@ -120,10 +133,14 @@ class FSHelpers {
                     video.filename != null && FS(videoUploadDir).deleteFile(video.filename)
                 }
                 true
-            } catch(e: Exception) {
+            } catch (e: Exception) {
                 println(e)
                 false
             }
+        }
+
+        suspend fun writeVideoAsStream(fileName: String, stream: InputStream) {
+            FS(videoUploadDir).writeFileStream(fileName, stream)
         }
     }
 }

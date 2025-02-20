@@ -1,3 +1,4 @@
+import com.example.src.response
 import com.example.src.utils.*
 import io.github.cdimascio.dotenv.Dotenv
 import kotlinx.coroutines.GlobalScope
@@ -7,6 +8,7 @@ import kotlinx.serialization.Serializable
 import org.jooq.DSLContext
 import org.jooq.Record
 import org.jooq.SQLDialect
+import org.jooq.UpdateSetMoreStep
 import org.jooq.impl.DSL
 import java.sql.Connection
 import java.sql.DriverManager
@@ -205,6 +207,17 @@ class DBHelpers {
             )
         }
 
+        suspend fun createVideoV2(
+            id: UUID, extension: String, name: String, isPremium: Boolean
+        ) = ioOperationWithErrorHandling("Cannot create video.") {
+            db.getDSLContext().insertInto(Videos).columns(
+                Videos.ID, Videos.NAME, Videos.ISPREMIUM, Videos.STATUS
+            ).values(id, name, isPremium, VideoStatus.PROCESSING.name).execute()
+
+            createVideoTemp(id, "$id.$extension")
+        }
+
+
         @Serializable
         data class AdminVideos(
             val id: String,
@@ -353,6 +366,10 @@ class DBHelpers {
             username
         }
 
+        suspend fun deleteSession(sessionId: UUID) = ioOperationWithErrorHandling("Cannot delete the session.") {
+            db.getDSLContext().deleteFrom(Sessions).where(Sessions.ID.eq(sessionId)).execute()
+        }
+
         @Serializable
         data class VideoData(
             val id: String,
@@ -414,5 +431,14 @@ class DBHelpers {
                 db.getDSLContext().insertInto(Views).columns(Views.USERID, Views.VIDEOID).values(username, videoId)
                     .execute()
             }
+
+        suspend fun editVideoAdmin(id: UUID, name: String?, isPremium: Boolean?) = ioOperationWithErrorHandling("Cannot edit a video.") {
+            val query = db.getDSLContext().update(Videos)
+
+            if(name != null) query.set(Videos.NAME, name)
+            if(isPremium != null) query.set(Videos.ISPREMIUM, isPremium)
+
+            (query as UpdateSetMoreStep<Record>).where(Videos.ID.eq(id)).execute()
+        }
     }
 }

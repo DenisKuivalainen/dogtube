@@ -15,7 +15,7 @@ import { useState } from "react";
 import axios from "axios";
 import { getFirstFrameAsBlob, useAdminAuth } from "~/utils";
 import { useNavigate } from "react-router";
-import { KeyboardArrowLeftRounded } from "@mui/icons-material";
+import { DoneRounded, KeyboardArrowLeftRounded } from "@mui/icons-material";
 
 function shuffleArray<T>(array: T[]): T[] {
   for (let i = array.length - 1; i > 0; i--) {
@@ -44,59 +44,35 @@ export default () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadingStatus, setUploadingStatus] = useState(0);
-  const [maxStatus, setMaxStatus] = useState(2);
+  const [loadingMsg, setLoadingMsg] = useState("");
+  const [loadingCompleted, setLoadingCompleted] = useState(false);
 
   const handleUpload = async () => {
-    const increaseStatus = () => setUploadingStatus((prev) => prev + 1);
-
     try {
       if (!selectedFile) return;
       setIsUploading(true);
+      setLoadingMsg("Uploading video...");
 
-      const { id: videoId, chunks } = await axios
-        .post(
-          "/api/admin/video",
-          {
-            name: title,
-            isPremium,
-            bufferSize: selectedFile.size,
-            extension: selectedFile.name.split(".").pop() || "mp4",
-          },
-          {
-            headers: {
-              Authorization: adminAuth.getAuthHeader(),
-            },
-          }
-        )
-        .then((res) => res.data);
+      const formData = new FormData();
+      formData.append("name", title);
+      formData.append("isPremium", isPremium ? "true" : "false");
+      formData.append("file", selectedFile);
 
-      setMaxStatus(chunks.length);
-
-      for (const chunk of shuffleArray<{
-        start: number;
-        end: number;
-        id: string;
-      }>(chunks)) {
-        const chunkData = selectedFile.slice(chunk.start, chunk.end);
-
-        const chunkFormData = new FormData();
-        chunkFormData.append("chunk", chunkData);
-        chunkFormData.append("chunkId", chunk.id);
-
-        await axios.put(`/api/admin/video/${videoId}`, chunkFormData, {
+      await Promise.all([
+        axios.post(`/api/admin/video/v2`, formData, {
           headers: {
             "Content-Type": "multipart/form-data",
             Authorization: adminAuth.getAuthHeader(),
           },
-        });
-        increaseStatus();
-      }
+        }),
+        new Promise((resolve) => setTimeout(resolve, 1500)),
+      ]);
 
+      setLoadingCompleted(true);
+      setLoadingMsg("Video was uploaded!");
       await new Promise((resolve) => setTimeout(resolve, 2000));
       navigate("/admin");
     } catch (e: any) {
-      setUploadingStatus(0);
       setIsUploading(false);
       console.log(e.response);
       window.alert(e?.response?.data || e.message);
@@ -104,29 +80,27 @@ export default () => {
   };
 
   return isUploading ? (
-    <>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+        padding: 2,
+        minHeight: "200px",
+      }}
+    >
       <Box
         sx={{
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: "center",
-          padding: 2,
-          minHeight: "200px",
+          position: "relative",
         }}
       >
-        <Box
-          sx={{
-            position: "relative",
-          }}
-        >
-          <CircularProgress
-            variant="determinate"
-            value={(uploadingStatus * 100) / maxStatus}
-            size={100}
-          />
-          <Typography
-            variant="h6"
+        <CircularProgress
+          size={100}
+          {...(loadingCompleted ? { variant: "determinate", value: 100 } : {})}
+        />
+        {loadingCompleted ? (
+          <DoneRounded
             sx={{
               position: "absolute",
               top: "50%",
@@ -134,18 +108,21 @@ export default () => {
               transform: "translate(-50%, -50%)",
               fontWeight: "bold",
             }}
-          >
-            {Math.round((uploadingStatus * 100) / maxStatus)}%
-          </Typography>
-        </Box>
-
-        <Typography variant="h6" sx={{ color: "text.secondary" }}>
-          {uploadingStatus == maxStatus
-            ? "Video was uploaded!"
-            : "Uploading..."}
-        </Typography>
+            style={{
+              height: 70,
+              width: 70,
+            }}
+            color="primary"
+          />
+        ) : (
+          <></>
+        )}
       </Box>
-    </>
+
+      <Typography variant="h6" sx={{ color: "text.secondary" }}>
+        {loadingMsg}
+      </Typography>
+    </Box>
   ) : (
     <>
       <Button

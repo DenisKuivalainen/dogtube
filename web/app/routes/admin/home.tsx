@@ -44,7 +44,7 @@ export default () => {
       <Button
         variant="contained"
         color="primary"
-        onClick={() => navigate("/admin/video/add")}
+        onClick={() => navigate("/admin/video/add/v2")}
         sx={{ marginBottom: 2 }}
         startIcon={<VideoCall />}
       >

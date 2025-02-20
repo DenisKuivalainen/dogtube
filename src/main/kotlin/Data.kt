@@ -18,3 +18,6 @@ data class CreateUserRequest(val username: String, val name: String, val passwor
 
 @Serializable
 data class LoginUserRequest(val username: String, val password: String)
+
+@Serializable
+data class EditVideoRequest(val name: String?, val isPremium: Boolean?)
