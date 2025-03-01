@@ -1,4 +1,3 @@
-import com.example.src.response
 import com.example.src.utils.*
 import io.github.cdimascio.dotenv.Dotenv
 import kotlinx.coroutines.GlobalScope
@@ -110,8 +109,27 @@ class DBHelpers {
                 .and(Videos.STATUS.ne(VideoStatus.READY.value)).execute()
         }
 
-        suspend fun getVideo(id: UUID): Record = ioOperationWithErrorHandling("Cannot get video info.") {
-            db.getDSLContext().select().from(Videos).where(Videos.ID.eq(id)).fetchOne() ?: throw Exception()
+        @Serializable
+        data class Video(
+            val id: String,
+            val name: String,
+            val createdAt: String,
+            val uploadedAt: String,
+            val status: String,
+            val isPremium: Boolean
+        )
+
+        suspend fun getVideo(id: UUID): Video = ioOperationWithErrorHandling("Cannot get video info.") {
+            db.getDSLContext().select().from(Videos).where(Videos.ID.eq(id)).fetchOne { record ->
+                Video(
+                    id = record[Videos.ID].toString(),
+                    name = record[Videos.NAME],
+                    createdAt = record[Videos.CREATEDAT].toString(),
+                    uploadedAt = record[Videos.UPLOADEDAT].toString(),
+                    status = record[Videos.STATUS],
+                    isPremium = record[Videos.ISPREMIUM]
+                )
+            } ?: throw Exception()
         }
 
         suspend fun getVideoFilename(id: UUID): String =
@@ -235,7 +253,7 @@ class DBHelpers {
             ioOperationWithErrorHandling("Cannot get all videos for admin.") {
                 val unique_views = DSL.field("COUNT(DISTINCT views.user_id) AS unique_views")
                 val all_views = DSL.field("COUNT(views.user_id) AS all_views")
-                val likes = DSL.field("COUNT(likes.user_id) AS likes")
+                val likes = DSL.field("COUNT(DISTINCT likes.user_id) AS likes")
 
                 val query = db.getDSLContext().select(
                     Videos.ID,
@@ -320,6 +338,7 @@ class DBHelpers {
         )
 
         suspend fun getUser(username: String): User = ioOperationWithErrorHandling("Cannot get user.") {
+            // TODO: check user subscription expiry, if it is expired, update status manually (since payment not implemented)
             db.getDSLContext().select(Users.asterisk()).from(Users).where(Users.ID.eq(username)).fetchOne { record ->
                 User(
                     id = record[Users.ID],
@@ -352,12 +371,12 @@ class DBHelpers {
         suspend fun getSession(sessionId: UUID): String = ioOperationWithErrorHandling("Cannot find the session.") {
             val username =
                 db.getDSLContext().select(Sessions.USERID).from(Sessions).where(Sessions.ID.eq(sessionId)).and(
-                        Sessions.ACCESSEDAT.greaterThan(
-                            DSL.field(
-                                "NOW() -  INTERVAL '30 minutes'", Timestamp::class.java
-                            )
+                    Sessions.ACCESSEDAT.greaterThan(
+                        DSL.field(
+                            "NOW() -  INTERVAL '30 minutes'", Timestamp::class.java
                         )
-                    ).fetchOne { record -> record[Sessions.USERID].toString() }
+                    )
+                ).fetchOne { record -> record[Sessions.USERID].toString() }
             username ?: throw Exception()
 
             db.getDSLContext().update(Sessions).set(Sessions.ACCESSEDAT, DSL.currentTimestamp())
@@ -387,7 +406,7 @@ class DBHelpers {
         suspend fun getAllVideos(username: String, searchText: String?): List<VideoData> =
             ioOperationWithErrorHandling("Cannot get all videos for admin.") {
                 val views = DSL.field("COUNT(DISTINCT views.user_id) AS unique_views")
-                val likes = DSL.field("COUNT(likes.user_id) AS likes")
+                val likes = DSL.field("COUNT(DISTINCT likes.user_id) AS likes")
                 val viewed = DSL.field("COUNT(*) FILTER (WHERE views.user_id = ?) > 0 AS viewed", username)
                 val liked = DSL.field("COUNT(*) FILTER (WHERE likes.user_id = ?) > 0 AS liked", username)
 
@@ -403,8 +422,7 @@ class DBHelpers {
                     viewed,
                     liked
                 ).from(Videos).leftJoin(Views).on("videos.id = views.video_id").leftJoin(Likes)
-                    .on("videos.id = likes.video_id")
-                    .where(Videos.STATUS.eq(VideoStatus.READY.value))
+                    .on("videos.id = likes.video_id").where(Videos.STATUS.eq(VideoStatus.READY.value))
 
                 if (searchText != null) query.and(Videos.NAME.likeIgnoreCase("%$searchText%"))
 
@@ -426,19 +444,191 @@ class DBHelpers {
                 }
             }
 
+        suspend fun getVideoData(username: String, videoId: UUID): VideoData =
+            ioOperationWithErrorHandling("Cannot get all videos for admin.") {
+                val views = DSL.field("COUNT(DISTINCT views.user_id) AS unique_views")
+                val likes = DSL.field("COUNT(DISTINCT likes.user_id) AS likes")
+                val viewed = DSL.field("COUNT(*) FILTER (WHERE views.user_id = ?) > 0 AS viewed", username)
+                val liked = DSL.field("COUNT(*) FILTER (WHERE likes.user_id = ?) > 0 AS liked", username)
+
+                db.getDSLContext().select(
+                    Videos.ID,
+                    Videos.NAME,
+                    Videos.CREATEDAT,
+                    Videos.UPLOADEDAT,
+                    Videos.STATUS,
+                    Videos.ISPREMIUM,
+                    views,
+                    likes,
+                    viewed,
+                    liked
+                ).from(Videos).leftJoin(Views).on("videos.id = views.video_id").leftJoin(Likes)
+                    .on("videos.id = likes.video_id").where(Videos.STATUS.eq(VideoStatus.READY.value))
+                    .and(Videos.ID.eq(videoId)).groupBy(DSL.field("videos.id")).fetchOne { record ->
+                        VideoData(
+                            id = record[Videos.ID].toString(),
+                            name = record[Videos.NAME],
+                            createdAt = record[Videos.CREATEDAT].toString(),
+                            uploadedAt = record[Videos.UPLOADEDAT].toString(),
+                            status = record[Videos.STATUS],
+                            isPremium = record[Videos.ISPREMIUM],
+                            views = record[views, Int::class.java] ?: 0,
+                            likes = record[likes, Int::class.java] ?: 0,
+                            viewed = record[viewed, Boolean::class.java] ?: false,
+                            liked = record[liked, Boolean::class.java] ?: false
+                        )
+                    } ?: throw Exception()
+            }
+
         suspend fun createVideoView(username: String, videoId: UUID) =
             ioOperationWithErrorHandling("Cannot create a video view.") {
                 db.getDSLContext().insertInto(Views).columns(Views.USERID, Views.VIDEOID).values(username, videoId)
                     .execute()
             }
 
-        suspend fun editVideoAdmin(id: UUID, name: String?, isPremium: Boolean?) = ioOperationWithErrorHandling("Cannot edit a video.") {
-            val query = db.getDSLContext().update(Videos)
+        suspend fun editVideoAdmin(id: UUID, name: String?, isPremium: Boolean?) =
+            ioOperationWithErrorHandling("Cannot edit a video.") {
+                val query = db.getDSLContext().update(Videos)
 
-            if(name != null) query.set(Videos.NAME, name)
-            if(isPremium != null) query.set(Videos.ISPREMIUM, isPremium)
+                if (name != null) query.set(Videos.NAME, name)
+                if (isPremium != null) query.set(Videos.ISPREMIUM, isPremium)
 
-            (query as UpdateSetMoreStep<Record>).where(Videos.ID.eq(id)).execute()
-        }
+                (query as UpdateSetMoreStep<Record>).where(Videos.ID.eq(id)).execute()
+            }
+
+        suspend fun setUserSubscriptionPremium(username: String) =
+            ioOperationWithErrorHandling("Cannot set a user subscription premium.") {
+                db.getDSLContext().update(Users).set(Users.SUBSCRIPTIONLEVEL, "PREMIUM").set(
+                    Users.SUBSCRIPTIONTILL, DSL.field(
+                        "NOW() + INTERVAL '1 MONTH'", Timestamp::class.java
+                    )
+                ).where(Users.ID.eq(username)).execute()
+            }
+
+        suspend fun likeVideo(username: String, videoId: UUID): VideoData =
+            ioOperationWithErrorHandling("Cannot like video $videoId.") {
+                val user = getUser(username)
+                val video = getVideo(videoId)
+                if (video.isPremium && user.subscription_level != "PREMIUM") throw Exception("User does not have PREMIUM subscription to like this video.")
+
+                val like = db.getDSLContext().select().from(Likes).where(Likes.VIDEOID.eq(videoId))
+                    .and(Likes.USERID.eq(username)).fetchOne()
+
+                if (like != null) {
+                    db.getDSLContext().delete(Likes).where(Likes.VIDEOID.eq(videoId)).and(Likes.USERID.eq(username))
+                        .execute()
+                } else {
+                    db.getDSLContext().insertInto(Likes).columns(Likes.USERID, Likes.VIDEOID).values(username, videoId)
+                        .execute()
+                }
+
+                getVideoData(username, videoId)
+            }
+
+        @Serializable
+        data class VideoStatistics(
+            val date: String, val likes: Int, val views: Int, val uniqueViews: Int, val messages: Int
+        )
+
+        suspend fun getPastMonthVideoStatisticsAdmin(videoId: UUID): List<VideoStatistics> =
+            ioOperationWithErrorHandling("Cannot get video $videoId statistics.") {
+                db.getDSLContext().fetch(
+                    // TODO: Replace with proper JOOQ query, not raw SQL
+                    """
+                    WITH date_series AS (
+                        SELECT generate_series(
+                            NOW() - INTERVAL '29 days', 
+                            NOW(), 
+                            INTERVAL '1 day'
+                        )::DATE AS date
+                    ),
+                    first_views AS (
+                        SELECT user_id, MIN(viewed_at) AS first_view_date
+                        FROM views
+                        WHERE video_id = ?
+                        GROUP BY user_id
+                    )
+                    SELECT 
+                        ds.date,
+                        COALESCE(l.likes_count, 0) AS likes,
+                        COALESCE(v.views_count, 0) AS views,
+                        COALESCE(uv.unique_views_count, 0) AS unique_views,
+                        COALESCE(m.messages_count, 0) AS messages
+                    FROM date_series ds
+                    LEFT JOIN (
+                        SELECT 
+                            DATE(liked_at) AS date,
+                            COUNT(*) AS likes_count
+                        FROM likes
+                        WHERE video_id = ?
+                        GROUP BY DATE(liked_at)
+                    ) l ON ds.date = l.date
+                    LEFT JOIN (
+                        SELECT 
+                            DATE(viewed_at) AS date,
+                            COUNT(*) AS views_count
+                        FROM views
+                        WHERE video_id = ?
+                        GROUP BY DATE(viewed_at)
+                    ) v ON ds.date = v.date
+                    LEFT JOIN (
+                        SELECT 
+                            DATE(first_view_date) AS date,
+                            COUNT(*) AS unique_views_count
+                        FROM first_views
+                        GROUP BY DATE(first_view_date)
+                    ) uv ON ds.date = uv.date
+                    LEFT JOIN (
+                        SELECT 
+                            DATE(posted_at) AS date,
+                            COUNT(*) AS messages_count
+                        FROM messages
+                        WHERE video_id = ?
+                        GROUP BY DATE(posted_at)
+                    ) m ON ds.date = m.date
+                    ORDER BY ds.date;
+            """, videoId, videoId, videoId, videoId
+                ).map { record ->
+                    VideoStatistics(
+                        date = record["date"].toString(),
+                        likes = (record["likes"] as? Number)?.toInt() ?: 0,
+                        views = (record["views"] as? Number)?.toInt() ?: 0,
+                        uniqueViews = (record["unique_views"] as? Number)?.toInt() ?: 0,
+                        messages = (record["messages"] as? Number)?.toInt() ?: 0
+                    )
+                }
+            }
+
+        suspend fun postMessage(username: String, videoId: UUID, message: String) =
+            ioOperationWithErrorHandling("Cannot post message for video $videoId.") {
+                val user = getUser(username)
+                val video = getVideo(videoId)
+                if (video.isPremium && user.subscription_level != "PREMIUM") throw Exception("User does not have PREMIUM subscription to comment this video.")
+
+                db.getDSLContext().insertInto(Messages).columns(Messages.VIDEOID, Messages.USERID, Messages.MESSAGE)
+                    .values(videoId, username, message).execute()
+            }
+
+        @Serializable
+        data class Message(
+            val username: String, val postedAt: String, val message: String, val myMessage: Boolean
+        )
+
+        suspend fun getMessages(username: String, videoId: UUID): List<Message> =
+            ioOperationWithErrorHandling("Cannot get messages for video $videoId") {
+                val user = getUser(username)
+                val video = getVideo(videoId)
+                if (video.isPremium && user.subscription_level != "PREMIUM") throw Exception("User does not have PREMIUM subscription to comment this video.")
+
+                db.getDSLContext().select().from(Messages).where(Messages.VIDEOID.eq(videoId))
+                    .orderBy(Messages.POSTEDAT.desc()).fetch { record ->
+                        Message(
+                            username = record[Messages.USERID].toString(),
+                            postedAt = record[Messages.POSTEDAT].toString(),
+                            message = record[Messages.MESSAGE].toString(),
+                            myMessage = record[Messages.USERID].toString() == user.id
+                        )
+                    }
+            }
     }
 }

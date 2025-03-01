@@ -9,7 +9,12 @@ suspend fun resizeVideo(input: String, output: String): Boolean = ioOperation {
             "-i",
             FSHelpers.getVideoSrcFilePath(input),
             "-vf",
-            "scale=-1:720",
+            """
+            format=yuv420p,
+            scale='if(gt(iw/ih,16/9),-2,min(iw,ih*16/9))':'if(gt(iw/ih,16/9),min(iw*9/16,ih),-2)',
+            crop='min(iw,ih*16/9)':'min(iw*9/16,ih)',
+            scale='if(lt(iw,1280),854,1280)':'if(lt(ih,720),480,720)'
+            """.trimIndent(),
             "-c:v",
             "libx264",
             "-preset",

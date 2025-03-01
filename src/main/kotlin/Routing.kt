@@ -17,6 +17,7 @@ fun Application.configureRouting() {
         adminVideos()
         user()
         videos()
+        subscription()
 
         staticResources("/static", "static")
     }

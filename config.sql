@@ -28,14 +28,14 @@ CREATE TABLE users
 
 CREATE TABLE views
 (
-    video_id  UUID NOT NULL REFERENCES videos (id) ON DELETE CASCADE,
+    video_id  UUID         NOT NULL REFERENCES videos (id) ON DELETE CASCADE,
     user_id   VARCHAR(255) NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     viewed_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE likes
 (
-    video_id UUID NOT NULL REFERENCES videos (id) ON DELETE CASCADE,
+    video_id UUID         NOT NULL REFERENCES videos (id) ON DELETE CASCADE,
     user_id  VARCHAR(255) NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     liked_at TIMESTAMP DEFAULT NOW(),
     CONSTRAINT unique_like UNIQUE (video_id, user_id)
@@ -59,17 +59,29 @@ CREATE TABLE video_chunks
 CREATE TABLE sessions
 (
     id          UUID PRIMARY KEY,
-    user_id     VARCHAR(255)      NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    accessed_at TIMESTAMP NOT NULL DEFAULT NOW()
+    user_id     VARCHAR(255) NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    accessed_at TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_views_user_id ON views(user_id);
+CREATE TABLE messages
+(
+    video_id  UUID         NOT NULL REFERENCES videos (id) ON DELETE CASCADE,
+    user_id   VARCHAR(255) NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    posted_at TIMESTAMP DEFAULT NOW(),
+    message   VARCHAR(1000) NOT NULL
+);
 
-CREATE INDEX idx_views_video_id ON views(video_id);
+CREATE INDEX idx_views_user_id ON views (user_id);
 
-CREATE INDEX idx_likes_user_id ON likes(user_id);
+CREATE INDEX idx_views_video_id ON views (video_id);
 
-CREATE INDEX idx_likes_video_id ON likes(video_id);
+CREATE INDEX idx_likes_user_id ON likes (user_id);
 
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX idx_likes_video_id ON likes (video_id);
+
+CREATE
+EXTENSION IF NOT EXISTS pg_trgm;
 CREATE INDEX idx_videos_name_trgm ON videos USING GIN(name gin_trgm_ops);
+
+CREATE INDEX idx_messages_video_id ON messages (video_id);
+

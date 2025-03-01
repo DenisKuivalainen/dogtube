@@ -57,7 +57,7 @@ export default () => {
     };
 
   return (
-    <Grid container spacing={2} sx={{ margin: 2 }}>
+    <Grid container spacing={2} style={{ padding: 16 }}>
       {videos.map((video) => (
         <Grid
           item

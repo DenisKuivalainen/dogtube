@@ -21,3 +21,9 @@ data class LoginUserRequest(val username: String, val password: String)
 
 @Serializable
 data class EditVideoRequest(val name: String?, val isPremium: Boolean?)
+
+@Serializable
+data class SubscriptionRequest(val cardNumber: String, val expiry: String, val cvv: String, val name: String)
+
+@Serializable
+data class PostMessageRequest(val message: String)

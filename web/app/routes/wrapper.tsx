@@ -74,7 +74,17 @@ const Navbar = ({
     <AppBar position="sticky">
       <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
         {/* Left Side: DOGTUBE */}
-        <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+        <Typography
+          variant="h6"
+          component="a"
+          href="/"
+          sx={{
+            fontWeight: "bold",
+            textDecoration: "none",
+            color: "white",
+          }}
+          // onClick={() => redirect("/")}
+        >
           DOG
           <Pets />
           TUBE

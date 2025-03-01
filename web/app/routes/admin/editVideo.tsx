@@ -17,12 +17,14 @@ import {
   Stack,
   Paper,
   CircularProgress,
+  colors,
 } from "@mui/material";
 import {
   Done,
   DoneRounded,
   KeyboardArrowLeftRounded,
 } from "@mui/icons-material";
+import { BarChart, LineChart } from "@mui/x-charts";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -114,6 +116,18 @@ export default () => {
       window.alert(e.message);
     }
   };
+
+  const [statistics, setStatistics] = useState<any[]>([]);
+  useEffect(() => {
+    axios
+      .get(`/api/admin/video/${videoId}/statistics`, {
+        headers: {
+          Authorization: adminAuth.getAuthHeader(),
+        },
+      })
+      .then((res) => res.data)
+      .then(setStatistics);
+  }, []);
 
   return typeof window == "undefined" || !videoData ? (
     <></>
@@ -243,6 +257,55 @@ export default () => {
             </DialogActions>
           </Dialog>
         </Stack>
+      </Paper>
+      <Paper
+        elevation={3}
+        sx={{
+          padding: 3,
+          maxWidth: window.innerWidth * 0.75,
+          mx: "auto",
+          mt: 4,
+          borderRadius: 2,
+        }}
+      >
+        <BarChart
+          dataset={statistics}
+          xAxis={[
+            {
+              id: "Date",
+              dataKey: "date",
+              scaleType: "band",
+            },
+          ]}
+          series={[
+            {
+              id: "Views",
+              label: "Views",
+              dataKey: "views",
+              color: colors.green[500],
+            },
+            {
+              id: "Unique views",
+              label: "Unique views",
+              dataKey: "uniqueViews",
+              color: colors.blue[500],
+            },
+            {
+              id: "Messages",
+              label: "Messages",
+              dataKey: "messages",
+              color: colors.yellow[500],
+            },
+            {
+              id: "Likes",
+              label: "Likes",
+              dataKey: "likes",
+              color: colors.red[500],
+            },
+          ]}
+          // width={600}
+          height={400}
+        />
       </Paper>
     </>
   );

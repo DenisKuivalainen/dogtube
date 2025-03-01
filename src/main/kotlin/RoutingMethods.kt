@@ -149,6 +149,22 @@ fun Route.adminVideos() {
                     }
                 }
 
+                get("statistics") {
+                    val videoId = call.parameters["id"]
+                    if (videoId == null) {
+                        call.respondText("Missing video ID", status = HttpStatusCode.BadRequest)
+                        return@get
+                    }
+
+                    val res = Admin.getVideoStatisticsForPastMonth(videoId)
+                    val resData = res.data
+                    if (resData != null) {
+                        call.respond(HttpStatusCode.OK, resData)
+                    } else {
+                        call.respond(HttpStatusCode.InternalServerError, res.error!!)
+                    }
+                }
+
                 delete { // delete video
                     val videoId = call.parameters["id"]
                     if (videoId == null) {
@@ -255,6 +271,7 @@ fun Route.user() {
     route("user") {
         route("create") {
             post {
+                println(1)
                 val body = call.receive<CreateUserRequest>()
 
                 val res = Users.createUser(body.username, body.name, body.password)
@@ -322,9 +339,41 @@ fun Route.videos() {
             }
 
             route("{videoId}") {
+                get{
+                    sessionResponseHandler(call) { principal ->
+                        Users.getVideo(principal.username, call.parameters["videoId"]!!)
+                    }
+                }
+
+                get("stream") {
+                    val principal = call.principal<UserSessionPrincipal>()
+
+                    if (principal != null) {
+                        val res = Users.streamVideo(principal.username, call.parameters["videoId"]!!, call.request.headers["Range"]!!)
+                        val resData = res.data
+                        if (resData != null) {
+                            call.response.header(HttpHeaders.AcceptRanges, "bytes")
+                            call.response.header(HttpHeaders.ContentType, "video/mp4")
+                            call.response.header(HttpHeaders.ContentRange, "bytes ${resData.start}-${resData.end}/${resData.length}")
+                            call.respondBytes(resData.buffer, ContentType.Video.MP4, HttpStatusCode.PartialContent)
+
+                        } else {
+                            call.respond(HttpStatusCode.InternalServerError, res.error!!)
+                        }
+                    } else {
+                        call.respond(HttpStatusCode.Unauthorized, "Invalid token.")
+                    }
+                }
+
                 post("view") {
                     sessionResponseHandler(call) { principal ->
                         Users.createVideoView(principal.username, call.parameters["videoId"]!!)
+                    }
+                }
+
+                post("like") {
+                    sessionResponseHandler(call) { principal ->
+                        Users.likeVideo(principal.username, call.parameters["videoId"]!!)
                     }
                 }
 
@@ -343,6 +392,33 @@ fun Route.videos() {
                     } else {
                         call.respond(HttpStatusCode.Unauthorized, "Invalid token.")
                     }
+                }
+
+                route("message") {
+                        get{
+                            sessionResponseHandler(call) { principal ->
+                                Users.getMessages(principal.username, call.parameters["videoId"]!!)
+                            }
+                        }
+
+                    post{
+                        sessionResponseHandler(call) { principal ->
+                            Users.postMessage(principal.username, call.parameters["videoId"]!!, call.receive<PostMessageRequest>().message)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun Route.subscription() {
+    authenticate("user_session") {
+        route("subscription") {
+            post {
+                sessionResponseHandler(call) { principal ->
+                    val body = call.receive<SubscriptionRequest>()
+                    Users.subscribe(principal.username, body.cardNumber, body.expiry, body.cvv, body.name)
                 }
             }
         }

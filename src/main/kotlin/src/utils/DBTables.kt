@@ -61,3 +61,11 @@ object Sessions : TableImpl<Record>(DSL.name("sessions")) {
     val USERID: Field<String> = DSL.field(DSL.name("user_id"), String::class.java)
     val ACCESSEDAT: Field<Timestamp> = DSL.field(DSL.name("accessed_at"), Timestamp::class.java)
 }
+
+object Messages : TableImpl<Record>(DSL.name("messages")) {
+    val VIDEOID: Field<UUID> = DSL.field(DSL.name("video_id"), UUID::class.java)
+    val USERID: Field<String> = DSL.field(DSL.name("user_id"), String::class.java)
+    val POSTEDAT: Field<Timestamp> = DSL.field(DSL.name("posted_at"), Timestamp::class.java)
+    val MESSAGE: Field<String> = DSL.field(DSL.name("message"), String::class.java)
+
+}

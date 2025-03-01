@@ -69,7 +69,7 @@ class Admin {
             val chunkId = UUID.fromString(_chunkId)
 
             val videoInDb = DBHelpers.getVideo(id)
-            if (videoInDb.get(Videos.STATUS) != VideoStatus.PENDING.value && videoInDb.get(Videos.STATUS) != VideoStatus.UPLOADING.value) {
+            if (videoInDb.status != VideoStatus.PENDING.value && videoInDb.status != VideoStatus.UPLOADING.value) {
                 throw Exception("Video status doesn't match.")
             }
 
@@ -141,6 +141,10 @@ class Admin {
 
         suspend fun editVideo(id: String,  name: String?, isPremium: Boolean?) = response {
             DBHelpers.editVideoAdmin(UUID.fromString(id), name, isPremium)
+        }
+
+        suspend fun getVideoStatisticsForPastMonth(videoId: String) = response {
+            DBHelpers.getPastMonthVideoStatisticsAdmin(UUID.fromString(videoId))
         }
     }
 

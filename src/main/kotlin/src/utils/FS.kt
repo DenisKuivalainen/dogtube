@@ -2,7 +2,6 @@ package com.example.src.utils
 
 import DBHelpers
 import ioOperationWithErrorHandling
-import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -74,6 +73,27 @@ class FS(private val directory: String) {
                 stream.copyTo(outputStream)
             }
         }
+
+    suspend fun getFileSize(filename: String):Long =ioOperationWithErrorHandling("Cannot get file $filename size.") {
+        File(directory, filename).length()
+    }
+
+    suspend fun getFileStreamChunk(filename: String, start: Long, end: Long): ByteArray =
+        ioOperationWithErrorHandling("Cannot read file $directory.") {
+            val file = File(directory, filename)
+            if (!file.exists()) {
+                throw Exception("File does not exist")
+            }
+
+            val chunkSize = (end - start).toInt() + 1
+            val buffer = ByteArray(chunkSize)
+            file.inputStream().use {
+                it.skip(start)
+                it.read(buffer, 0, chunkSize)
+            }
+
+            buffer
+        }
 }
 
 class FSHelpers {
@@ -141,6 +161,14 @@ class FSHelpers {
 
         suspend fun writeVideoAsStream(fileName: String, stream: InputStream) {
             FS(videoUploadDir).writeFileStream(fileName, stream)
+        }
+
+        suspend fun getFileSize(videoId: String): Long {
+            return FS(videoDir).getFileSize("$videoId.mp4")
+        }
+
+        suspend fun getVideoChunk(videoId: String, start: Long, end: Long): ByteArray {
+            return FS(videoDir).getFileStreamChunk("$videoId.mp4", start, end)
         }
     }
 }
