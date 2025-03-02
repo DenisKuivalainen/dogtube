@@ -1,18 +1,17 @@
 import {
-  TextField,
-  Button,
   Box,
-  Typography,
+  Button,
   CssBaseline,
-  ThemeProvider,
-  createTheme,
   Link,
+  TextField,
+  ThemeProvider,
+  Typography,
+  createTheme,
 } from "@mui/material";
-import { useForm } from "react-hook-form";
-import type { Route } from "../+types/root";
-import axios from "axios";
-import { darkTheme, useUtils } from "~/utils";
 import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { axiosInstance, darkTheme, useUtils } from "~/utils";
+import type { Route } from "../+types/root";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -25,7 +24,6 @@ export default () => {
   const {
     register,
     handleSubmit,
-    watch,
     setError,
     formState: { errors },
   } = useForm();
@@ -33,17 +31,15 @@ export default () => {
   const theme = createTheme(darkTheme);
 
   useEffect(() => {
-    axios
-      .get("api/user", {
-        withCredentials: true,
-      })
+    axiosInstance
+      .get("api/user")
       .then(() => redirect("/"))
       .catch(() => {});
   }, []);
 
   const onSubmit = async (data: any) => {
     try {
-      await axios.post("api/user/login", {
+      await axiosInstance.post("api/user/login", {
         username: data.username,
         password: data.password,
       });
@@ -86,7 +82,6 @@ export default () => {
             variant="outlined"
             {...register("username", { required: "Username is required" })}
             error={!!errors.username}
-            helperText={errors.username?.message || " "}
             autoComplete="off"
           />
           <TextField

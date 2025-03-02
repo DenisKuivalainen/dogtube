@@ -1,4 +1,4 @@
-import { AccountCircle, Pets, Search, Star } from "@mui/icons-material";
+import { AccountCircle, Pets, Search } from "@mui/icons-material";
 import {
   AppBar,
   Box,
@@ -17,18 +17,14 @@ import {
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { Outlet, useSearchParams } from "react-router";
-import { darkTheme, useUtils } from "~/utils";
+import { axiosInstance, darkTheme, useUtils } from "~/utils";
 
 const Navbar = ({
-  isPremium,
   username,
-  onUpgrade = () => {},
   onLogout = () => {},
   onSettings = () => {},
 }: {
-  isPremium: boolean;
   username: string;
-  onUpgrade?: () => void | Promise<void>;
   onLogout?: () => void | Promise<void>;
   onSettings?: () => void | Promise<void>;
 }) => {
@@ -51,11 +47,6 @@ const Navbar = ({
     setAnchorEl(null);
   };
 
-  const handleUpgradeClick = () => {
-    onUpgrade();
-    handleMenuClose();
-  };
-
   const handleSettingsClick = () => {
     onSettings();
     handleMenuClose();
@@ -73,7 +64,6 @@ const Navbar = ({
   return (
     <AppBar position="sticky">
       <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
-        {/* Left Side: DOGTUBE */}
         <Typography
           variant="h6"
           component="a"
@@ -83,7 +73,6 @@ const Navbar = ({
             textDecoration: "none",
             color: "white",
           }}
-          // onClick={() => redirect("/")}
         >
           DOG
           <Pets />
@@ -118,7 +107,6 @@ const Navbar = ({
           />
         </Box>
 
-        {/* Right Side: User icon and name */}
         <Box>
           <Button
             endIcon={<AccountCircle />}
@@ -140,10 +128,7 @@ const Navbar = ({
               horizontal: "right",
             }}
           >
-            {/* Settings */}
             <MenuItem onClick={handleSettingsClick}>Settings</MenuItem>
-
-            {/* Logout */}
             <MenuItem onClick={handleLogoutClick}>Logout</MenuItem>
           </Menu>
         </Box>
@@ -159,10 +144,8 @@ export default () => {
   const [userData, setUserData] = useState<any>();
 
   useEffect(() => {
-    axios
-      .get("api/user", {
-        withCredentials: true,
-      })
+    axiosInstance
+      .get("api/user")
       .then((res) => res.data)
       .then((res) => setUserData(res))
       .catch((e) => {
@@ -188,17 +171,13 @@ export default () => {
       {userData ? (
         <>
           <Navbar
-            isPremium={userData.subscription_level == "PREMIUM"}
             username={userData.name}
             onLogout={() => {
-              axios
-                .post("api/user/logout", {
-                  withCredentials: true,
-                })
+              axiosInstance
+                .post("api/user/logout")
                 .then(() => redirect("/signin"));
             }}
-            onUpgrade={() => redirect("/subscription")}
-          />{" "}
+          />
           <Outlet context={{ userData }} />
         </>
       ) : (

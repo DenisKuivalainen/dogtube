@@ -1,18 +1,17 @@
 import {
-  TextField,
-  Button,
   Box,
-  Typography,
+  Button,
   CssBaseline,
-  ThemeProvider,
-  createTheme,
   Link,
+  TextField,
+  ThemeProvider,
+  Typography,
+  createTheme,
 } from "@mui/material";
-import { useForm } from "react-hook-form";
-import type { Route } from "../+types/root";
-import axios from "axios";
-import { darkTheme, useUtils } from "~/utils";
 import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { axiosInstance, darkTheme, useUtils } from "~/utils";
+import type { Route } from "../+types/root";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -33,27 +32,19 @@ export default () => {
   const theme = createTheme(darkTheme);
 
   useEffect(() => {
-    axios
-      .get("api/user", {
-        withCredentials: true,
-      })
+    axiosInstance
+      .get("api/user")
       .then(() => redirect("/"))
       .catch(() => {});
   }, []);
 
   const onSubmit = async (data: any) => {
     try {
-      await axios.post(
-        "/api/user/create",
-        {
-          username: data.username,
-          name: data.name,
-          password: data.password,
-        },
-        {
-          withCredentials: true,
-        }
-      );
+      await axiosInstance.post("/api/user/create", {
+        username: data.username,
+        name: data.name,
+        password: data.password,
+      });
 
       redirect();
     } catch (e: any) {
@@ -64,7 +55,7 @@ export default () => {
     }
   };
 
-  const password = watch("password"); // Get the password value to compare with repeat password
+  const password = watch("password");
 
   return (
     <ThemeProvider theme={theme}>
@@ -95,7 +86,7 @@ export default () => {
             variant="outlined"
             {...register("name", { required: "Name is required" })}
             error={!!errors.name}
-            helperText={errors.name?.message || " "}
+            helperText={(errors.name?.message || " ") as string}
             autoComplete="off"
           />
           <TextField
@@ -105,7 +96,7 @@ export default () => {
             variant="outlined"
             {...register("username", { required: "Username is required" })}
             error={!!errors.username}
-            helperText={errors.username?.message || " "}
+            helperText={(errors.username?.message || " ") as string}
             autoComplete="off"
           />
           <TextField
@@ -143,7 +134,9 @@ export default () => {
             })}
             error={!!errors.repeatPassword}
             helperText={
-              errors.password?.message || errors.repeatPassword?.message || " "
+              (errors.password?.message ||
+                errors.repeatPassword?.message ||
+                " ") as string
             }
             autoComplete="off"
           />

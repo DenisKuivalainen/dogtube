@@ -29,12 +29,8 @@ export default () => {
   const [videos, setVideos] = useState<any[]>([]);
 
   useEffect(() => {
-    axios
-      .get("/api/admin/video", {
-        headers: {
-          Authorization: adminAuth.getAuthHeader(),
-        },
-      })
+    adminAuth.axiosInstance
+      .get("/video")
       .then((res) => res.data)
       .then((res) => setVideos(res));
   }, []);
@@ -88,7 +84,7 @@ export default () => {
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Uploaded at:{" "}
-                  {isNaN(new Date(record.uploadedAt))
+                  {isNaN(new Date(record.uploadedAt).valueOf())
                     ? "-"
                     : new Date(record.uploadedAt).toLocaleString()}
                 </Typography>

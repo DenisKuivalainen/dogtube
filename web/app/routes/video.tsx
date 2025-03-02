@@ -1,7 +1,14 @@
-import { useEffect, useRef, useState } from "react";
-import type { Route } from "./+types/home";
-import { useOutletContext, useParams } from "react-router";
-import axios from "axios";
+import {
+  Favorite,
+  FavoriteBorder,
+  Pause,
+  PlayArrow,
+  Replay,
+  Reply,
+  Send,
+  VolumeOff,
+  VolumeUp,
+} from "@mui/icons-material";
 import {
   Box,
   Button,
@@ -14,60 +21,16 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import {
-  Favorite,
-  FavoriteBorder,
-  Pause,
-  PlayArrow,
-  Replay,
-  Reply,
-  Send,
-  Share,
-  Visibility,
-  VolumeOff,
-  VolumeUp,
-} from "@mui/icons-material";
+import { useEffect, useRef, useState } from "react";
+import { useParams } from "react-router";
+import { axiosInstance, useTimeAgo } from "~/utils";
+import type { Route } from "./+types/home";
 
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "Dogtube" },
     { name: "description", content: "Watch doggo videos!" },
   ];
-}
-
-function timeAgo(d: string) {
-  const date = new Date(d);
-  const now = new Date();
-  const diffInSeconds = Math.floor((now.valueOf() - date.valueOf()) / 1000);
-
-  const minutes = Math.floor(diffInSeconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-  const weeks = Math.floor(days / 7);
-  const months = Math.floor(days / 30);
-  const years = Math.floor(days / 365);
-
-  if (minutes == 0) return `less than a minute ago`;
-  if (minutes < 60) return `${minutes} minute${minutes !== 1 ? "s" : ""} ago`;
-  if (hours < 24) return `${hours} hour${hours !== 1 ? "s" : ""} ago`;
-  if (days < 7) return `${days} day${days !== 1 ? "s" : ""} ago`;
-  if (weeks < 4) return `${weeks} week${weeks !== 1 ? "s" : ""} ago`;
-  if (months < 12) return `${months} month${months !== 1 ? "s" : ""} ago`;
-  return `${years} year${years !== 1 ? "s" : ""} ago`;
-}
-
-export function useTimeAgo() {
-  const nowRef = useRef(new Date());
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      nowRef.current = new Date();
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  return (d: string) => timeAgo(d);
 }
 
 export default () => {
@@ -84,8 +47,26 @@ export default () => {
   );
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [ended, setEnded] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  const [messages, setMessages] = useState<
+    {
+      username: string;
+      postedAt: string;
+      message: string;
+      myMessage: boolean;
+    }[]
+  >([]);
 
-  // Toggle Play/Pause
+  const [videoData, setVideoData] = useState<{
+    name: string;
+    uploadedAt: string;
+    views: number;
+    likes: number;
+    liked: boolean;
+  }>();
+
   const togglePlay = () => {
     if (videoRef.current) {
       if (playing) {
@@ -157,8 +138,6 @@ export default () => {
     }
   };
 
-  const [muted, setMuted] = useState(false);
-
   const toggleMute = () => {
     if (videoRef.current) {
       const newMuted = !muted;
@@ -166,8 +145,6 @@ export default () => {
       setMuted(newMuted);
     }
   };
-
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
 
   const handleShare = async () => {
     const url = window.location.href;
@@ -179,37 +156,20 @@ export default () => {
     }
   };
 
-  const [videoData, setVideoData] = useState<{
-    name: string;
-    uploadedAt: string;
-    views: number;
-    likes: number;
-    liked: boolean;
-  }>();
-
   useEffect(() => {
-    axios
-      .get(`/api/video/${videoId}`, { withCredentials: true })
+    axiosInstance
+      .get(`/api/video/${videoId}`)
       .then((res) => res.data)
       .then(setVideoData);
   }, []);
 
   const like = () => {
-    axios
-      .post(`/api/video/${videoId}/like`, {}, { withCredentials: true })
+    axiosInstance
+      .post(`/api/video/${videoId}/like`)
       .then((res) => res.data)
       .then(setVideoData);
   };
 
-  const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<
-    {
-      username: string;
-      postedAt: string;
-      message: string;
-      myMessage: boolean;
-    }[]
-  >([]);
   const handleMessageChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -221,10 +181,11 @@ export default () => {
 
     setMessage(newVal);
   };
+
   const submitMessage = async () => {
     if (message.length <= 0 && message.length > 1000) return;
 
-    await axios.post(`/api/video/${videoId}/message`, {
+    await axiosInstance.post(`/api/video/${videoId}/message`, {
       message: encodeURIComponent(message),
     });
     setMessage("");
@@ -232,7 +193,7 @@ export default () => {
   };
 
   const fetchMessages = () =>
-    axios
+    axiosInstance
       .get(`/api/video/${videoId}/message`)
       .then((res) => res.data)
       .then(setMessages);
@@ -375,7 +336,7 @@ export default () => {
                 display: "flex",
                 alignItems: "center",
                 alignSelf: "flex-start",
-                ml: "auto", // Push to the right
+                ml: "auto",
               }}
             >
               <Button

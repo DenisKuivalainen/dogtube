@@ -1,5 +1,4 @@
-import type { Route } from "./+types/home";
-import { Welcome } from "../../welcome/welcome";
+import { DoneRounded, KeyboardArrowLeftRounded } from "@mui/icons-material";
 import {
   Box,
   Button,
@@ -11,11 +10,11 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useState } from "react";
 import axios from "axios";
-import { getFirstFrameAsBlob, useAdminAuth } from "~/utils";
+import { useState } from "react";
 import { useNavigate } from "react-router";
-import { DoneRounded, KeyboardArrowLeftRounded } from "@mui/icons-material";
+import { useAdminAuth } from "~/utils";
+import type { Route } from "./+types/home";
 
 function shuffleArray<T>(array: T[]): T[] {
   for (let i = array.length - 1; i > 0; i--) {
@@ -59,10 +58,9 @@ export default () => {
       formData.append("file", selectedFile);
 
       await Promise.all([
-        axios.post(`/api/admin/video/v2`, formData, {
+        adminAuth.axiosInstance.post(`video/v2`, formData, {
           headers: {
             "Content-Type": "multipart/form-data",
-            Authorization: adminAuth.getAuthHeader(),
           },
         }),
         new Promise((resolve) => setTimeout(resolve, 1500)),

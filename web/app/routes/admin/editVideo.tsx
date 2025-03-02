@@ -40,13 +40,15 @@ export default () => {
 
   const [videoData, setVideoData] = useState<any>();
 
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingCompleted, setLoadingCompleted] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState("");
+
+  const [statistics, setStatistics] = useState<any[]>([]);
+
   useEffect(() => {
-    axios
-      .get(`/api/admin/video/${videoId}`, {
-        headers: {
-          Authorization: adminAuth.getAuthHeader(),
-        },
-      })
+    adminAuth.axiosInstance
+      .get(`/video/${videoId}`)
       .then((res) => res.data)
       .then((res) => setVideoData(res));
   }, []);
@@ -59,28 +61,16 @@ export default () => {
     setDeleteDialogOpen(false);
   };
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadingCompleted, setLoadingCompleted] = useState(false);
-  const [loadingMsg, setLoadingMsg] = useState("");
-
   const handleUpdate = async () => {
     try {
       setIsLoading(true);
       setLoadingMsg("Updating...");
 
       await Promise.all([
-        axios.patch(
-          `/api/admin/video/${videoId}`,
-          {
-            name: videoData.name,
-            isPremium: videoData.isPremium,
-          },
-          {
-            headers: {
-              Authorization: adminAuth.getAuthHeader(),
-            },
-          }
-        ),
+        adminAuth.axiosInstance.patch(`/video/${videoId}`, {
+          name: videoData.name,
+          isPremium: videoData.isPremium,
+        }),
         new Promise((resolve) => setTimeout(resolve, 1500)),
       ]);
 
@@ -99,11 +89,7 @@ export default () => {
       setLoadingMsg("Deleting...");
 
       await Promise.all([
-        axios.delete(`/api/admin/video/${videoId}`, {
-          headers: {
-            Authorization: adminAuth.getAuthHeader(),
-          },
-        }),
+        adminAuth.axiosInstance.delete(`/video/${videoId}`),
         new Promise((resolve) => setTimeout(resolve, 1500)),
       ]);
 
@@ -117,14 +103,9 @@ export default () => {
     }
   };
 
-  const [statistics, setStatistics] = useState<any[]>([]);
   useEffect(() => {
-    axios
-      .get(`/api/admin/video/${videoId}/statistics`, {
-        headers: {
-          Authorization: adminAuth.getAuthHeader(),
-        },
-      })
+    adminAuth.axiosInstance
+      .get(`/video/${videoId}/statistics`)
       .then((res) => res.data)
       .then(setStatistics);
   }, []);
@@ -196,7 +177,7 @@ export default () => {
             fullWidth
             defaultValue={videoData?.name || ""}
             onChange={(e) =>
-              setVideoData((prev) => ({
+              setVideoData((prev: any) => ({
                 ...prev,
                 name: e.target.value,
               }))
@@ -207,7 +188,7 @@ export default () => {
               <Checkbox
                 checked={videoData?.isPremium}
                 onChange={() =>
-                  setVideoData((prev) => ({
+                  setVideoData((prev: any) => ({
                     ...prev,
                     isPremium: !prev.isPremium,
                   }))
@@ -303,7 +284,6 @@ export default () => {
               color: colors.red[500],
             },
           ]}
-          // width={600}
           height={400}
         />
       </Paper>

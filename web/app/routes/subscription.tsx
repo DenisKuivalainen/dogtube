@@ -1,6 +1,3 @@
-import { useEffect, useState } from "react";
-import type { Route } from "./+types/home";
-import { useOutletContext } from "react-router";
 import {
   Box,
   Button,
@@ -11,8 +8,10 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import axios from "axios";
-import { useUtils } from "~/utils";
+import { useEffect, useState } from "react";
+import { useOutletContext } from "react-router";
+import { axiosInstance, useUtils } from "~/utils";
+import type { Route } from "./+types/home";
 
 const validateCardNumber = (cardNumber: string) => {
   const sanitized = cardNumber.replace(/\D/g, "");
@@ -91,10 +90,8 @@ export default () => {
       if (!validateExpiryDate(formData.expiry))
         throw Error("Invalid expirity date.");
 
-      axios
-        .post("api/subscription", formData, {
-          withCredentials: true,
-        })
+      axiosInstance
+        .post("api/subscription", formData)
         .then(() => redirect("/"));
     } catch (e: any) {
       alert(e.message);

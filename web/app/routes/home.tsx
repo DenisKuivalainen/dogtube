@@ -12,7 +12,7 @@ import {
   Typography,
 } from "@mui/material";
 import { Favorite, Star, Visibility } from "@mui/icons-material";
-import { useUtils } from "~/utils";
+import { axiosInstance, useAdminAuth, useUtils } from "~/utils";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -28,11 +28,10 @@ export default () => {
   const [videos, setVideos] = useState<any[]>([]);
   const [searchParams] = useSearchParams();
   const search = decodeURIComponent(searchParams.get("search") || "");
+  const [videoClicked, setVideoClicked] = useState(false);
 
   const fetchVideos = async () => {
-    const res = await axios.get(`/api/video?search=${search}`, {
-      withCredentials: true,
-    });
+    const res = await axiosInstance.get(`/api/video?search=${search}`);
 
     setVideos(res.data);
   };
@@ -41,7 +40,6 @@ export default () => {
     fetchVideos();
   }, [search]);
 
-  const [videoClicked, setVideoClicked] = useState(false);
   const handleVideoClick =
     (id: string, isPremiumVideo: boolean) => async () => {
       if (videoClicked) return;
@@ -51,7 +49,7 @@ export default () => {
       if (isPremiumVideo && userData.subscription_level != "PREMIUM") {
         redirect("/subscription");
       } else {
-        await axios.post(`/api/video/${id}/view`).catch(() => {});
+        await axiosInstance.post(`/api/video/${id}/view`).catch(() => {});
         redirect(`/${id}`);
       }
     };
@@ -69,25 +67,6 @@ export default () => {
           style={{ cursor: "pointer" }}
         >
           <Card sx={{ position: "relative" }}>
-            {/* {video.isPremium && userData.subscription_level !== "PREMIUM" && (
-              <Box
-                sx={{
-                  position: "absolute",
-                  width: "100%",
-                  top: 8,
-                  color: "secondary.main",
-                  px: 1,
-                  py: 0.5,
-                  borderRadius: 1,
-                  fontSize: "0.75rem",
-                  fontWeight: "bold",
-                  textAlign: "right",
-                }}
-              >
-                Premium
-              </Box>
-            )} */}
-
             <CardMedia
               component="img"
               height="240"

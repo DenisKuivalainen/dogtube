@@ -1,4 +1,5 @@
-import { createTheme } from "@mui/system";
+import axios from "axios";
+import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 export const useAdminAuth = () => {
@@ -6,6 +7,7 @@ export const useAdminAuth = () => {
   const location = useLocation();
 
   const logout = (redirect?: string) => {
+    if (typeof localStorage === "undefined") return;
     localStorage.removeItem("admin_jwt");
     navigate(
       `/admin/auth${
@@ -15,22 +17,31 @@ export const useAdminAuth = () => {
   };
 
   const getAuthHeader = () => {
-    const jwt = localStorage.getItem("admin_jwt");
+    if (typeof localStorage == "undefined") return "";
+
+    const jwt = localStorage?.getItem("admin_jwt");
 
     if (jwt) return `Bearer ${jwt}`;
 
     logout(location.pathname);
   };
 
+  const axiosInstance = axios.create({
+    baseURL: "/api/admin",
+    headers: {
+      Authorization: getAuthHeader(),
+    },
+  });
+
   return {
     logout,
     getAuthHeader,
+    axiosInstance,
   };
 };
 
 export const useUtils = () => {
   const navigate = useNavigate();
-  const location = useLocation();
 
   return {
     redirect: (path?: string) => navigate(path || "/"),
@@ -83,3 +94,42 @@ export const darkTheme: any = {
     },
   },
 };
+
+export const axiosInstance = axios.create({
+  headers: {
+    withCredentials: true,
+  },
+});
+
+export function useTimeAgo() {
+  const nowRef = useRef(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      nowRef.current = new Date();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return (d: string) => {
+    const date = new Date(d);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.valueOf() - date.valueOf()) / 1000);
+
+    const minutes = Math.floor(diffInSeconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    const weeks = Math.floor(days / 7);
+    const months = Math.floor(days / 30);
+    const years = Math.floor(days / 365);
+
+    if (minutes == 0) return `less than a minute ago`;
+    if (minutes < 60) return `${minutes} minute${minutes !== 1 ? "s" : ""} ago`;
+    if (hours < 24) return `${hours} hour${hours !== 1 ? "s" : ""} ago`;
+    if (days < 7) return `${days} day${days !== 1 ? "s" : ""} ago`;
+    if (weeks < 4) return `${weeks} week${weeks !== 1 ? "s" : ""} ago`;
+    if (months < 12) return `${months} month${months !== 1 ? "s" : ""} ago`;
+    return `${years} year${years !== 1 ? "s" : ""} ago`;
+  };
+}

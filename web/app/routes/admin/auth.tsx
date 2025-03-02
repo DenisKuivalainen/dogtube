@@ -3,6 +3,7 @@ import type { Route } from "./+types/home";
 import { Button, TextField, Box } from "@mui/material";
 import axios from "axios";
 import { redirect, useLocation, useNavigate } from "react-router";
+import { useAdminAuth } from "~/utils";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -18,13 +19,14 @@ export default () => {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const adminAuth = useAdminAuth();
 
   const handleLogin = async () => {
     if (loading) return;
     setLoading(true);
     try {
-      const jwt = await axios
-        .post("/api/admin/user/login", { username, password })
+      const jwt = await adminAuth.axiosInstance
+        .post("/user/login", { username, password })
         .then((res) => res.data.jwt);
 
       localStorage.setItem("admin_jwt", jwt);
