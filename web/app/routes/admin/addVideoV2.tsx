@@ -58,7 +58,7 @@ export default () => {
       formData.append("file", selectedFile);
 
       await Promise.all([
-        adminAuth.axiosInstance.post(`video/v2`, formData, {
+        adminAuth.axiosInstance().post(`video/v2`, formData, {
           headers: {
             "Content-Type": "multipart/form-data",
           },

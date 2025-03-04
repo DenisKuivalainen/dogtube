@@ -47,7 +47,8 @@ export default () => {
   const [statistics, setStatistics] = useState<any[]>([]);
 
   useEffect(() => {
-    adminAuth.axiosInstance
+    adminAuth
+      .axiosInstance()
       .get(`/video/${videoId}`)
       .then((res) => res.data)
       .then((res) => setVideoData(res));
@@ -67,7 +68,7 @@ export default () => {
       setLoadingMsg("Updating...");
 
       await Promise.all([
-        adminAuth.axiosInstance.patch(`/video/${videoId}`, {
+        adminAuth.axiosInstance().patch(`/video/${videoId}`, {
           name: videoData.name,
           isPremium: videoData.isPremium,
         }),
@@ -89,7 +90,7 @@ export default () => {
       setLoadingMsg("Deleting...");
 
       await Promise.all([
-        adminAuth.axiosInstance.delete(`/video/${videoId}`),
+        adminAuth.axiosInstance().delete(`/video/${videoId}`),
         new Promise((resolve) => setTimeout(resolve, 1500)),
       ]);
 
@@ -104,7 +105,8 @@ export default () => {
   };
 
   useEffect(() => {
-    adminAuth.axiosInstance
+    adminAuth
+      .axiosInstance()
       .get(`/video/${videoId}/statistics`)
       .then((res) => res.data)
       .then(setStatistics);

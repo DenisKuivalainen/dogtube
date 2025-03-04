@@ -25,7 +25,8 @@ export default () => {
     if (loading) return;
     setLoading(true);
     try {
-      const jwt = await adminAuth.axiosInstance
+      const jwt = await adminAuth
+        .axiosInstance(false)
         .post("/user/login", { username, password })
         .then((res) => res.data.jwt);
 

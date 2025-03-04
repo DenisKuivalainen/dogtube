@@ -29,7 +29,8 @@ export default () => {
   const [videos, setVideos] = useState<any[]>([]);
 
   useEffect(() => {
-    adminAuth.axiosInstance
+    adminAuth
+      .axiosInstance()
       .get("/video")
       .then((res) => res.data)
       .then((res) => setVideos(res));

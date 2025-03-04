@@ -7,8 +7,9 @@ export const useAdminAuth = () => {
   const location = useLocation();
 
   const logout = (redirect?: string) => {
-    if (typeof localStorage === "undefined") return;
-    localStorage.removeItem("admin_jwt");
+    if (typeof localStorage !== "undefined")
+      localStorage.removeItem("admin_jwt");
+
     navigate(
       `/admin/auth${
         redirect ? `?redirectUrl=${encodeURIComponent(redirect!)}` : ""
@@ -26,12 +27,15 @@ export const useAdminAuth = () => {
     logout(location.pathname);
   };
 
-  const axiosInstance = axios.create({
-    baseURL: "/api/admin",
-    headers: {
-      Authorization: getAuthHeader(),
-    },
-  });
+  const axiosInstance = (withAuth: boolean = true) =>
+    axios.create({
+      baseURL: "/api/admin",
+      headers: withAuth
+        ? {
+            Authorization: getAuthHeader(),
+          }
+        : {},
+    });
 
   return {
     logout,

@@ -14,7 +14,7 @@ export default () => {
 
   const loadUserData = async () => {
     try {
-      const user = await adminAuth.axiosInstance.get("/user", {
+      const user = await adminAuth.axiosInstance().get("/user", {
         headers: {
           Authorization: adminAuth.getAuthHeader(),
         },
