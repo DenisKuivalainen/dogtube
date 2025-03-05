@@ -7,20 +7,30 @@ import ioOperation
 import kotlinx.coroutines.*
 
 suspend fun videosCleanup() = ioOperation {
-    val videosToDelete = DBHelpers.getVideosToDelete()
-    FSHelpers.deleteVideos(videosToDelete)
+    try {
+        val videosToDelete = DBHelpers.getVideosToDelete()
+        FSHelpers.deleteVideos(videosToDelete)
+    } catch (e: Exception) {
+        println("Video cleanup failed: ${e.message}")
+    }
+}
+
+suspend fun sessionsCleanup() = ioOperation {
+    try {
+        DBHelpers.deleteOldSessions()
+    } catch (e: Exception) {
+        println("Sessions cleanup failed: ${e.message}")
+    }
 }
 
 fun Application.scheduledTask() {
     environment.monitor.subscribe(ApplicationStarted) {
         val job = launch(Dispatchers.Default) {
             while (isActive) {
-                try {
-                    videosCleanup()
-                } catch (e: Exception) {
-                    println(e.message)
-                }
-                delay(60*60*1000)
+                listOf(
+                    async { videosCleanup() },
+                    async { sessionsCleanup() },
+                    async { delay(60 * 60 * 1000) }).awaitAll()
             }
         }
 

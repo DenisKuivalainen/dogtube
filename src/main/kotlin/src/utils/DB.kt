@@ -380,13 +380,21 @@ class DBHelpers {
             username ?: throw Exception()
 
             db.getDSLContext().update(Sessions).set(Sessions.ACCESSEDAT, DSL.currentTimestamp())
-                .where(Sessions.USERID.eq(username)).execute()
+                .where(Sessions.USERID.eq(username)).and(Sessions.ID.eq(sessionId)).execute()
 
             username
         }
 
         suspend fun deleteSession(sessionId: UUID) = ioOperationWithErrorHandling("Cannot delete the session.") {
             db.getDSLContext().deleteFrom(Sessions).where(Sessions.ID.eq(sessionId)).execute()
+        }
+
+        suspend fun deleteOldSessions() = ioOperationWithErrorHandling("Cannot delete old sessions.") {
+            db.getDSLContext().deleteFrom(Sessions).where(
+                    Sessions.ACCESSEDAT.lessThan(
+                        DSL.field("NOW() - INTERVAL '30 minutes'", Timestamp::class.java)
+                    )
+                ).execute()
         }
 
         @Serializable

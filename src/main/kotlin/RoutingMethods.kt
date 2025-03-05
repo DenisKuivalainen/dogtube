@@ -271,8 +271,8 @@ fun Route.user() {
     route("user") {
         route("create") {
             post {
-                println(1)
                 val body = call.receive<CreateUserRequest>()
+
 
                 val res = Users.createUser(body.username, body.name, body.password)
                 val sessionId = res.data
@@ -339,7 +339,7 @@ fun Route.videos() {
             }
 
             route("{videoId}") {
-                get{
+                get {
                     sessionResponseHandler(call) { principal ->
                         Users.getVideo(principal.username, call.parameters["videoId"]!!)
                     }
@@ -349,12 +349,19 @@ fun Route.videos() {
                     val principal = call.principal<UserSessionPrincipal>()
 
                     if (principal != null) {
-                        val res = Users.streamVideo(principal.username, call.parameters["videoId"]!!, call.request.headers["Range"]!!)
+                        val res = Users.streamVideo(
+                            principal.username,
+                            call.parameters["videoId"]!!,
+                            call.request.headers["Range"]!!
+                        )
                         val resData = res.data
                         if (resData != null) {
                             call.response.header(HttpHeaders.AcceptRanges, "bytes")
                             call.response.header(HttpHeaders.ContentType, "video/mp4")
-                            call.response.header(HttpHeaders.ContentRange, "bytes ${resData.start}-${resData.end}/${resData.length}")
+                            call.response.header(
+                                HttpHeaders.ContentRange,
+                                "bytes ${resData.start}-${resData.end}/${resData.length}"
+                            )
                             call.respondBytes(resData.buffer, ContentType.Video.MP4, HttpStatusCode.PartialContent)
 
                         } else {
@@ -395,15 +402,19 @@ fun Route.videos() {
                 }
 
                 route("message") {
-                        get{
-                            sessionResponseHandler(call) { principal ->
-                                Users.getMessages(principal.username, call.parameters["videoId"]!!)
-                            }
-                        }
-
-                    post{
+                    get {
                         sessionResponseHandler(call) { principal ->
-                            Users.postMessage(principal.username, call.parameters["videoId"]!!, call.receive<PostMessageRequest>().message)
+                            Users.getMessages(principal.username, call.parameters["videoId"]!!)
+                        }
+                    }
+
+                    post {
+                        sessionResponseHandler(call) { principal ->
+                            Users.postMessage(
+                                principal.username,
+                                call.parameters["videoId"]!!,
+                                call.receive<PostMessageRequest>().message
+                            )
                         }
                     }
                 }
