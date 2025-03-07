@@ -251,34 +251,38 @@ class DBHelpers {
 
         suspend fun getAllVideosAdmin(): List<AdminVideos> =
             ioOperationWithErrorHandling("Cannot get all videos for admin.") {
-                val unique_views = DSL.field("COUNT(DISTINCT views.user_id) AS unique_views")
-                val all_views = DSL.field("COUNT(views.user_id) AS all_views")
-                val likes = DSL.field("COUNT(DISTINCT likes.user_id) AS likes")
 
-                val query = db.getDSLContext().select(
-                    Videos.ID,
-                    Videos.NAME,
-                    Videos.CREATEDAT,
-                    Videos.UPLOADEDAT,
-                    Videos.STATUS,
-                    Videos.ISPREMIUM,
-                    unique_views,
-                    all_views,
-                    likes
-                ).from(Videos).leftJoin(Views).on("videos.id = views.video_id").leftJoin(Likes)
-                    .on("videos.id = likes.video_id").groupBy(DSL.field("videos.id"))
-
-                query.fetch { record ->
+                db.getDSLContext().fetch(
+                    // TODO: Replace with proper JOOQ query, not raw SQL
+                    """
+                        SELECT 
+                            v.*, 
+                            COALESCE(vw.all_views, 0) AS all_views, 
+                            COALESCE(vw.unique_views, 0) AS unique_views, 
+                            COALESCE(lk.likes, 0) AS likes
+                        FROM videos v
+                        LEFT JOIN (
+                            SELECT video_id, COUNT(*) AS all_views, COUNT(DISTINCT user_id) AS unique_views
+                            FROM views
+                            GROUP BY video_id
+                        ) vw ON v.id = vw.video_id
+                        LEFT JOIN (
+                            SELECT video_id, COUNT(DISTINCT user_id) AS likes
+                            FROM likes
+                            GROUP BY video_id
+                        ) lk ON v.id = lk.video_id;
+                    """,
+                ).map { record ->
                     AdminVideos(
-                        id = record[Videos.ID].toString(),
-                        name = record[Videos.NAME],
-                        createdAt = record[Videos.CREATEDAT].toString(),
-                        uploadedAt = record[Videos.UPLOADEDAT].toString(),
-                        status = record[Videos.STATUS],
-                        isPremium = record[Videos.ISPREMIUM],
-                        uniqueViews = record[unique_views, Int::class.java] ?: 0,
-                        allViews = record[all_views, Int::class.java] ?: 0,
-                        likes = record[likes, Int::class.java] ?: 0
+                        id = record["id"].toString(),
+                        name = record["name", String::class.java],
+                        createdAt = record["created_at"].toString(),
+                        uploadedAt = record["uploaded_at"].toString(),
+                        status = record["status", String::class.java],
+                        isPremium = record["is_premium", Boolean::class.java],
+                        uniqueViews = record["unique_views", Int::class.java] ?: 0,
+                        allViews = record["all_views", Int::class.java] ?: 0,
+                        likes = record["likes", Int::class.java] ?: 0
                     )
                 }
             }
@@ -391,10 +395,10 @@ class DBHelpers {
 
         suspend fun deleteOldSessions() = ioOperationWithErrorHandling("Cannot delete old sessions.") {
             db.getDSLContext().deleteFrom(Sessions).where(
-                    Sessions.ACCESSEDAT.lessThan(
-                        DSL.field("NOW() - INTERVAL '30 minutes'", Timestamp::class.java)
-                    )
-                ).execute()
+                Sessions.ACCESSEDAT.lessThan(
+                    DSL.field("NOW() - INTERVAL '30 minutes'", Timestamp::class.java)
+                )
+            ).execute()
         }
 
         @Serializable
@@ -599,10 +603,10 @@ class DBHelpers {
                 ).map { record ->
                     VideoStatistics(
                         date = record["date"].toString(),
-                        likes = (record["likes"] as? Number)?.toInt() ?: 0,
-                        views = (record["views"] as? Number)?.toInt() ?: 0,
-                        uniqueViews = (record["unique_views"] as? Number)?.toInt() ?: 0,
-                        messages = (record["messages"] as? Number)?.toInt() ?: 0
+                        likes = record["likes", Int::class.java] ?: 0,
+                        views = record["views", Int::class.java] ?: 0,
+                        uniqueViews = record["unique_views", Int::class.java] ?: 0,
+                        messages = record["messages", Int::class.java] ?: 0
                     )
                 }
             }
